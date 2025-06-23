@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
+#include <linmath.h>
 
 #include "phys_math.h"
 
@@ -9,18 +10,27 @@
 #define G 9.81
 
 
+// signum function (int --> double)
+int sgn(double val) {
+    return (0.0 < val) - (val < 0.0);
+}
+
 // takes lddp state and returns the derivative of each state variable
-deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c) {
-    
+deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma) {
     deriv_ddp_t d = {0};
+    d.dphi = s->omega;
+    d.d2phi = (gamma * pow(c->omega0, 2) * cos(c->omegad * t)) - (2 * c->beta * s->omega) - (pow(c->omega0, 2) * sin(s->phi));
+
     return d;
 }
 
 
 // takes qddp state and returns the derivative of each state variable
-deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c) {
-
+deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma) {
     deriv_ddp_t d = {0};
+    d.dphi = s->omega;
+    d.d2phi = (gamma * pow(c->omega0, 2) * cos(c->omegad * t)) - (2 * c->beta * sgn(s->omega) * pow(s->omega, 2)) - (pow(c->omega0, 2) * sin(s->phi));
+
     return d;
 }
 

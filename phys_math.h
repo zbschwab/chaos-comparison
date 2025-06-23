@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
+#include <linmath.h>
 
 # pragma once
 
@@ -12,14 +13,14 @@
 // ddp constants (same for linear and quadratic damping)
 typedef struct cons_ddp {
     double omega0;  // natural frequency
-    double omega;  // driving frequency
+    double omegad;  // driving frequency
     double beta;  // damping
 } cons_ddp_t;
 
 // ddp state: pendulum angle and velocity
 typedef struct state_ddp {
-    double phi_0;
-    double dphi_0;
+    double phi;
+    double omega;
 } state_ddp_t;
 
 // ddp velocity and acceleration
@@ -52,11 +53,14 @@ typedef struct deriv_dp {
     double d2theta_2;
 } deriv_dp_t;
 
-// takes ddp state and returns derivative of each state variable
-deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c);
+// signum function
+int sgn(double val);
 
 // takes ddp state and returns derivative of each state variable
-deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c);
+deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
+
+// takes ddp state and returns derivative of each state variable
+deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 
 // takes dp state and returns derivative of each state variable
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);

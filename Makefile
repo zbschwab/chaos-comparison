@@ -7,7 +7,7 @@ clean :
 	rm -rf chaos_comparison chaos_comparison.dSYM
 
 chaos_comparison : chaos_comparison.c phys_math.c phys_math.h
-	$(CC) $(CFLAGS) -o chaos_comparison chaos_comparison.c phys_math.c -lm
+	$(CC) $(CFLAGS) -o chaos_comparison chaos_comparison.c phys_math.c -lm -Iexternal/linmath.h
 
 phys_math.o : phys_math.c phys_math.h
 	$(CC) $(CFLAGS) -c phys_math.c
