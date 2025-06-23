@@ -9,8 +9,24 @@
 #define G 9.81
 
 
-// takes state and returns the derivative of each state variable
-deriv_dp_t deriv(state_dp_t *s, cons_dp_t *c) {
+// takes lddp state and returns the derivative of each state variable
+deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c) {
+    
+    deriv_ddp_t d = {0};
+    return d;
+}
+
+
+// takes qddp state and returns the derivative of each state variable
+deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c) {
+
+    deriv_ddp_t d = {0};
+    return d;
+}
+
+
+// takes dp state and returns the derivative of each state variable
+deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c) {
     // calculate f and alpha for coupled ODEs (see equation sheet)
     double f_1, f_2, alpha_1, alpha_2, denom, M, diff;
 
