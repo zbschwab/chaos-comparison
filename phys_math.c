@@ -60,8 +60,8 @@ deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c) {
     return d;
 }
 
-// integration step w/ adaptive RK45 alg for ddp
-double rk45_ddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma) {
+// integration step w/ adaptive RK45 alg for lddp
+double rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma) {
     state_ddp_t temp = *s;
     deriv_ddp_t k1, k2, k3, k4, k5, k6;
 
@@ -86,6 +86,46 @@ double rk45_ddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double 
     temp.phi = s->phi + B16 * k1.dphi + B26 * k2.dphi + B36 * k3.dphi + B46 * k4.dphi + B56 * k5.dphi;
     temp.omega = s->omega + B16 * k1.d2phi + B26 * k2.d2phi + B36 * k3.d2phi + B46 * k4.d2phi + B56 * k5.d2phi;
     k6 = deriv_lddp(&temp, c, t + A6*dt, gamma);
+
+    // calculate new state
+    s->phi += dt * (CH1 * k1.dphi + CH3 * k3.dphi + CH4 * k4.dphi + CH5 * k5.dphi + CH6 * k6.dphi);
+    s->omega += dt * (CH1 * k1.d2phi + CH3 * k3.d2phi + CH4 * k4.d2phi + CH5 * k5.d2phi + CH6 * k6.d2phi);
+
+    // calculate truncation error
+    double dphi_err, d2phi_err, trunc_err;
+    dphi_err = fabs(CT1 * k1.dphi + CT3 * k3.dphi + CT4 * k4.dphi + CT5 * k5.dphi + CT6 * k6.dphi);
+    d2phi_err = fabs(CT1 * k1.d2phi + CT3 * k3.d2phi + CT4 * k4.d2phi + CT5 * k5.d2phi + CT6 * k6.d2phi);
+    trunc_err = fmax(dphi_err, d2phi_err);
+
+    return trunc_err;
+}
+
+// integration step w/ adaptive RK45 alg for qddp
+double rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma) {
+    state_ddp_t temp = *s;
+    deriv_ddp_t k1, k2, k3, k4, k5, k6;
+
+    k1 = deriv_qddp(s, c, t + dt, gamma);
+
+    temp.phi = s->phi + B12 * k1.dphi;
+    temp.omega = s->omega + B12 * k1.d2phi;
+    k2 = deriv_qddp(&temp, c, t + A2*dt, gamma);
+
+    temp.phi = s->phi + B13 * k1.dphi + B23 * k2.dphi;
+    temp.omega = s->omega + B13 * k1.d2phi + B23 * k2.d2phi;
+    k3 = deriv_qddp(&temp, c, t + A3*dt, gamma);
+
+    temp.phi = s->phi + B14 * k1.dphi + B24 * k2.dphi + B34 * k3.dphi;
+    temp.omega = s->omega + B14 * k1.d2phi + B24 * k2.d2phi + B34 * k3.d2phi;
+    k4 = deriv_qddp(&temp, c, t + A4*dt, gamma);
+
+    temp.phi = s->phi + B15 * k1.dphi + B25 * k2.dphi + B35 * k3.dphi + B45 * k4.dphi;
+    temp.omega = s->omega + B15 * k1.d2phi + B25 * k2.d2phi + B35 * k3.d2phi + B45 * k4.d2phi;
+    k5 = deriv_qddp(&temp, c, t + A5*dt, gamma);
+
+    temp.phi = s->phi + B16 * k1.dphi + B26 * k2.dphi + B36 * k3.dphi + B46 * k4.dphi + B56 * k5.dphi;
+    temp.omega = s->omega + B16 * k1.d2phi + B26 * k2.d2phi + B36 * k3.d2phi + B46 * k4.d2phi + B56 * k5.d2phi;
+    k6 = deriv_qddp(&temp, c, t + A6*dt, gamma);
 
     // calculate new state
     s->phi += dt * (CH1 * k1.dphi + CH3 * k3.dphi + CH4 * k4.dphi + CH5 * k5.dphi + CH6 * k6.dphi);
