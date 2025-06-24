@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
-#include <linmath.h>
+#include <cblas.h>
+
 
 # pragma once
 
@@ -56,10 +57,10 @@ typedef struct deriv_dp {
 // signum function
 int sgn(double val);
 
-// takes ddp state and returns derivative of each state variable
+// takes lddp state and returns derivative of each state variable
 deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 
-// takes ddp state and returns derivative of each state variable
+// takes qddp state and returns derivative of each state variable
 deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 
 // takes dp state and returns derivative of each state variable
@@ -70,3 +71,12 @@ double rk45_ddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double 
 
 // integration step w/ RK45 alg for dp
 double rk45_dp_step(state_dp_t *s, cons_dp_t *c, double dt);
+
+// takes lddp state and returns jacobian matrix (local linearization)
+double* jac_lddp(state_ddp_t *s, cons_ddp_t *c, double t);
+
+// takes qddp state and returns jacobian matrix (local linearization)
+double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
+
+// takes dp state and returns jacobian matrix (local linearization)
+double* jac_dp(state_ddp_t *s, cons_ddp_t *c, double t);

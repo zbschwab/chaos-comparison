@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
-#include <linmath.h>
+#include <cblas.h>
 
 #include "phys_math.h"
 #include "butcher_tableau.h"
@@ -194,3 +194,13 @@ double rk45_dp_step(state_dp_t *s, cons_dp_t *c, double dt) {
     return trunc_err;
 }
 
+// takes lddp state and returns jacobian matrix (local linearization)
+double* jac_lddp(state_ddp_t *s, cons_ddp_t *c, double t) {
+    double* jac = (double*)malloc(4*sizeof(double));
+    jac[0] = 0;
+    jac[1] = 1;
+    jac[2] = - pow(c->omega0, 2) * cos(s->phi);
+    jac[3] = - 2 * c->beta;
+
+    return jac;
+}
