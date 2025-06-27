@@ -66,8 +66,11 @@ deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 // takes dp state and returns derivative of each state variable
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);
 
-// integration step w/ RK45 alg for ddp
-double rk45_ddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+// integration step w/ RK45 alg for lddp
+double rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+
+// integration step w/ RK45 alg for qddp
+double rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
 
 // integration step w/ RK45 alg for dp
 double rk45_dp_step(state_dp_t *s, cons_dp_t *c, double dt);
@@ -79,4 +82,4 @@ double* jac_lddp(state_ddp_t *s, cons_ddp_t *c, double t);
 double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t);
 
 // takes dp state and returns jacobian matrix (local linearization)
-double* jac_dp(state_ddp_t *s, cons_ddp_t *c);
+double* jac_dp(state_dp_t *s, cons_dp_t *c);
