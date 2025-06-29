@@ -71,7 +71,7 @@ int main(void) {
     lddp_jac = jac_lddp(s_lddp, c_lddp, t_step);
 
 
-    printf(" %lf ", &lddp_jac);
+    printf(" %lf ", *lddp_jac);
 
     // // initialize array to store convergence steps
     // double lddp_lyp_con[6000];
