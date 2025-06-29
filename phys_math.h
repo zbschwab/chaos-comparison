@@ -66,20 +66,29 @@ deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 // takes dp state and returns derivative of each state variable
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);
 
-// integration step w/ RK45 alg for lddp
+// calculate one step of lddp's phase space trajectory with RK45 integration algorithm
 double rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
 
-// integration step w/ RK45 alg for qddp
+// calculate one step of qddp's phase space trajectory with RK45 integration algorithm
 double rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
 
-// integration step w/ RK45 alg for dp
+// calculate one step of dp's phase space trajectory with RK45 integration algorithm
 double rk45_dp_step(state_dp_t *s, cons_dp_t *c, double dt);
 
 // takes lddp state and returns jacobian matrix (local linearization)
-double* jac_lddp(state_ddp_t *s, cons_ddp_t *c, double t);
+double* jac_lddp(state_ddp_t *s, cons_ddp_t *c);
 
 // takes qddp state and returns jacobian matrix (local linearization)
 double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t);
 
 // takes dp state and returns jacobian matrix (local linearization)
 double* jac_dp(state_dp_t *s, cons_dp_t *c);
+
+// calculate one step of lddp's deviation vector with a LTM (linearized tangent map) using RK45
+double rk4_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double t, double dt, double gamma);
+
+// calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45
+double rk4_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+
+// calculate one step of dp's deviation vector with a LTM using RK45
+double rk4_LTM_dp_step(state_dp_t *s, cons_dp_t *c, double t, double dt);
