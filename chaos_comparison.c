@@ -87,5 +87,23 @@ int main(void) {
 
     // dp
 
+    // write data to csv
+    FILE *lddp_file;
+
+    lddp_file = fopen("lddp_lyp.csv", "w");
+    fprintf(lddp_file,"gamma, max_lyp\n");
+    for (int i = 0; i < gamma_step; i++) {
+        fprintf(lddp_file, "%lf, %lf\n", gamma_arr[i], lddp_mlyp[i]);
+    }
+    fclose(lddp_file);
+
+    FILE *qddp_file;
+    qddp_file = fopen("qddp_lyp.csv", "w");
+    fprintf(qddp_file,"gamma, max_lyp\n");
+    for (int i = 0; i < gamma_step; i++) {
+        fprintf(qddp_file, "%lf, %lf\n", gamma_arr[i], qddp_mlyp[i]);
+    }
+    fclose(qddp_file);
+
 
 }
