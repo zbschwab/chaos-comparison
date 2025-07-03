@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <math.h>
 #include <cblas.h>
 
@@ -85,10 +86,10 @@ double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t);
 double* jac_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's deviation vector with a LTM (linearized tangent map) using RK45
-double rk4_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double t, double dt, double gamma);
+double rk45_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double t, double dt, double gamma);
 
 // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45
-double rk4_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+// double rk45_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
 
-// calculate one step of dp's deviation vector with a LTM using RK45
-double rk4_LTM_dp_step(state_dp_t *s, cons_dp_t *c, double t, double dt);
+// // calculate one step of dp's deviation vector with a LTM using RK45
+// double rk45_LTM_dp_step(state_dp_t *s, cons_dp_t *c, double t, double dt);
