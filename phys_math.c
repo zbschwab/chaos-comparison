@@ -14,6 +14,7 @@
 #define ALPHA 1.0
 #define BETA 1.0
 #define ATOL 0.0001
+#define RTOL 0.001
 #define DT_MIN 0.00001
 
 
@@ -68,53 +69,64 @@ deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c) {
 
 // integration step w/ adaptive RK45 alg for lddp
 double rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma) {
-    double trunc_err;
+    deriv_ddp_t k1, k2, k3, k4, k5, k6, b4, b5;
+    state_ddp_t temp = *s;
+
+    k1 = deriv_lddp(s, c, t, gamma);
+
+    temp.phi = s->phi + A12 * k1.dphi;
+    temp.omega = s->omega + A12 * k1.d2phi;
+    k2 = deriv_lddp(&temp, c, t + C2*dt, gamma);
+
+    temp.phi = s->phi + A13 * k1.dphi + A23 * k2.dphi;
+    temp.omega = s->omega + A13 * k1.d2phi + A23 * k2.d2phi;
+    k3 = deriv_lddp(&temp, c, t + C3*dt, gamma);
+
+    temp.phi = s->phi + A14 * k1.dphi + A24 * k2.dphi + A34 * k3.dphi;
+    temp.omega = s->omega + A14 * k1.d2phi + A24 * k2.d2phi + A34 * k3.d2phi;
+    k4 = deriv_lddp(&temp, c, t + C4*dt, gamma);
+
+    temp.phi = s->phi + A15 * k1.dphi + A25 * k2.dphi + A35 * k3.dphi + A45 * k4.dphi;
+    temp.omega = s->omega + A15 * k1.d2phi + A25 * k2.d2phi + A35 * k3.d2phi + A45 * k4.d2phi;
+    k5 = deriv_lddp(&temp, c, t + C5*dt, gamma);
+
+    temp.phi = s->phi + A16 * k1.dphi + A26 * k2.dphi + A36 * k3.dphi + A46 * k4.dphi + A56 * k5.dphi;
+    temp.omega = s->omega + A16 * k1.d2phi + A26 * k2.d2phi + A36 * k3.d2phi + A46 * k4.d2phi + A56 * k5.d2phi;
+    k6 = deriv_lddp(&temp, c, t + C6*dt, gamma);
+
+    // 4th-order estimate (aka k7)
+    temp.phi = s->phi + A17 * k1.dphi + A37 * k3.dphi + A47 * k4.dphi + A57 * k5.dphi + A67 * k6.dphi;
+    temp.omega = s->omega + A17 * k1.d2phi + A37 * k3.d2phi + A47 * k4.d2phi + A57 * k5.d2phi + A67 * k6.d2phi;
+    b4 = deriv_lddp(&temp, c, t + C7*dt, gamma);
+
+    // 5th-order estimate
+    b5.dphi = B1 * k1.dphi + B3 * k3.dphi + B4 * k4.dphi + B5 * k5.dphi + B6 * k6.dphi + B7 * b4.dphi;
+    b5.d2phi = B1 * k1.d2phi + B3 * k3.d2phi + B4 * k4.d2phi + B5 * k5.d2phi + B6 * k6.d2phi + B7 * b4.d2phi;
+    
+    // compute + norm truncation error
+    double scale_phi = ATOL + RTOL * fabs(s->phi);
+    double scale_omega = ATOL + RTOL * fabs(s->omega);
+
+    double e0 = (b5.dphi - b4.dphi) / scale_phi;
+    double e1 = (b5.d2phi - b4.d2phi) / scale_omega;
+
+    double err_norm = sqrt((e0*e0 + e1*e1) / 2.0);
+    
+    // update state if error norm < 1
+    if (err_norm <= 1.0) {
+        s->phi = s->phi + dt * b5.dphi;
+        s->omega = s->omega + dt * b5.d2phi;
+    } 
+
+    // compute new dt (w/ safety clamp)
     double exp = 1.0 / 5.0;
-    deriv_ddp_t k1, k2, k3, k4, k5, k6;
+    double factor = 0.9 * pow(1.0 / err_norm, exp);
+    if (factor < 1.0) {factor = 1.0;}
+    if (factor > 5.0) {factor = 5.0;}
+    dt *= factor;
 
-    do {
-        state_ddp_t temp = *s;
+    printf("step complete. dt = %lf, err_norm = %lf, rk4 = %lf, %lf, rk5 = %lf, %lf\n", dt, err_norm, b4.dphi, b4.d2phi, b5.dphi, b5.d2phi);
 
-        k1 = deriv_lddp(s, c, t + dt, gamma);
-
-        temp.phi = s->phi + B12 * k1.dphi;
-        temp.omega = s->omega + B12 * k1.d2phi;
-        k2 = deriv_lddp(&temp, c, t + A2*dt, gamma);
-
-        temp.phi = s->phi + B13 * k1.dphi + B23 * k2.dphi;
-        temp.omega = s->omega + B13 * k1.d2phi + B23 * k2.d2phi;
-        k3 = deriv_lddp(&temp, c, t + A3*dt, gamma);
-
-        temp.phi = s->phi + B14 * k1.dphi + B24 * k2.dphi + B34 * k3.dphi;
-        temp.omega = s->omega + B14 * k1.d2phi + B24 * k2.d2phi + B34 * k3.d2phi;
-        k4 = deriv_lddp(&temp, c, t + A4*dt, gamma);
-
-        temp.phi = s->phi + B15 * k1.dphi + B25 * k2.dphi + B35 * k3.dphi + B45 * k4.dphi;
-        temp.omega = s->omega + B15 * k1.d2phi + B25 * k2.d2phi + B35 * k3.d2phi + B45 * k4.d2phi;
-        k5 = deriv_lddp(&temp, c, t + A5*dt, gamma);
-
-        temp.phi = s->phi + B16 * k1.dphi + B26 * k2.dphi + B36 * k3.dphi + B46 * k4.dphi + B56 * k5.dphi;
-        temp.omega = s->omega + B16 * k1.d2phi + B26 * k2.d2phi + B36 * k3.d2phi + B46 * k4.d2phi + B56 * k5.d2phi;
-        k6 = deriv_lddp(&temp, c, t + A6*dt, gamma);
-
-        // calculate truncation error
-        double dphi_err, d2phi_err;
-        dphi_err = fabs(CT1 * k1.dphi + CT3 * k3.dphi + CT4 * k4.dphi + CT5 * k5.dphi + CT6 * k6.dphi);
-        d2phi_err = fabs(CT1 * k1.d2phi + CT3 * k3.d2phi + CT4 * k4.d2phi + CT5 * k5.d2phi + CT6 * k6.d2phi);
-        trunc_err = fmax(dphi_err, d2phi_err);
-
-        if (trunc_err > ATOL) {
-            dt = 0.9 * dt * pow(ATOL / trunc_err, exp);
-        }
-        printf("inner do step complete. dt = %lf , trunc_err = %lf\n", dt, trunc_err);
-
-    } while (trunc_err > ATOL); 
-
-    // calculate new state
-    s->phi += dt * (CH1 * k1.dphi + CH3 * k3.dphi + CH4 * k4.dphi + CH5 * k5.dphi + CH6 * k6.dphi);
-    s->omega += dt * (CH1 * k1.d2phi + CH3 * k3.d2phi + CH4 * k4.d2phi + CH5 * k5.d2phi + CH6 * k6.d2phi);
-
-    printf("step complete. dt = %lf\n", dt);
     return dt;
 }
 
