@@ -6,6 +6,7 @@
 #include <cblas.h>
 
 #include "phys_math.h"
+#include "butcher_tableau.h"
 
 #define COMPUTE_STEPS 1000000
 #define GAMMA_STEPS 100
@@ -14,50 +15,51 @@
 int main(void) {
     // set constants and initial conditions:
     double dt = 0.01;
+    double t = 0.0;
 
     // lddp
     cons_ddp_t* c_lddp = (cons_ddp_t*)malloc(sizeof(cons_ddp_t));
     state_ddp_t* s_lddp = (state_ddp_t*)malloc(sizeof(state_ddp_t));;
     double* lddp_jac = (double*)malloc(sizeof(double));
 
-    c_lddp->beta = 3/4 * PI;
-    c_lddp->omega0 = 3 * PI;
-    c_lddp->omegad = 2 * PI;
+    c_lddp->beta = 3.0/4.0 * PI;
+    c_lddp->omega0 = 3.0 * PI;
+    c_lddp->omegad = 2.0 * PI;
 
-    s_lddp->phi = 0;
-    s_lddp->omega = 0;
+    s_lddp->phi = 0.0;
+    s_lddp->omega = 0.0;
 
     // qddp
     cons_ddp_t* c_qddp = (cons_ddp_t*)malloc(sizeof(cons_ddp_t));
     state_ddp_t* s_qddp = (state_ddp_t*)malloc(sizeof(state_ddp_t));;
     double* qddp_jac = (double*)malloc(sizeof(double));
 
-    c_qddp->beta = 1;
-    c_qddp->omega0 = 1;
-    c_qddp->omegad = 1;
+    c_qddp->beta = 1.0;
+    c_qddp->omega0 = 1.0;
+    c_qddp->omegad = 1.0;
 
-    s_qddp->phi = 2;
-    s_qddp->omega = 2;
+    s_qddp->phi = 2.0;
+    s_qddp->omega = 2.0;
 
     // dp
     cons_dp_t* c_dp = (cons_dp_t*)malloc(sizeof(cons_dp_t));
     state_dp_t* s_dp = (state_dp_t*)malloc(sizeof(state_dp_t));;
     double* dp_jac = (double*)malloc(sizeof(double));
 
-    c_dp->m_1 = 1;
-    c_dp->m_2 = 1;
-    c_dp->l_1 = 1;
-    c_dp->l_2 = 1;
+    c_dp->m_1 = 1.0;
+    c_dp->m_2 = 1.0;
+    c_dp->l_1 = 1.0;
+    c_dp->l_2 = 1.0;
 
-    s_dp->theta_1 = 2;
-    s_dp->theta_2 = 2;
-    s_dp->omega_1 = 2;
-    s_dp->omega_2 = 2;
+    s_dp->theta_1 = 2.0;
+    s_dp->theta_2 = 2.0;
+    s_dp->omega_1 = 2.0;
+    s_dp->omega_2 = 2.0;
     
     // make pertubation parameter arrays:
     // lddp + qddp
     double gamma_arr[GAMMA_STEPS] = {0};
-    double gamma_start = 1;
+    double gamma_start = 1.0;
     double gamma_stop = 1.1;
     double gamma_step = (gamma_stop - gamma_start)/(GAMMA_STEPS - 1);
 
@@ -74,11 +76,14 @@ int main(void) {
 
     printf(" %lf ", *lddp_jac);
 
-    double *lddp_traj = (double*)malloc(COMPUTE_STEPS*sizeof(double));
+    double *lddp_traj = (double*)malloc(2*COMPUTE_STEPS*sizeof(double));
 
-    for (int i = 0; i < COMPUTE_STEPS; i++) {
-        rk45_lddp_step(s_lddp, c_lddp, 0, dt, 1.1);
-        lddp_traj[i] = s_lddp->omega;
+    // i < 2*COMPUTE_STEPS;
+    for (int i = 0; i < 10; i+=2) {
+        dt = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
+        t += dt;
+        lddp_traj[i] = s_lddp->phi;
+        lddp_traj[i+1] = s_lddp->omega;
     }
 
     // // initialize array to store convergence steps

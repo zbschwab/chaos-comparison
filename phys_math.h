@@ -58,6 +58,8 @@ typedef struct deriv_dp {
 // signum function
 int sgn(double val);
 
+// L2 norm ??
+
 // takes lddp state and returns derivative of each state variable
 deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 
