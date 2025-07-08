@@ -14,8 +14,11 @@
 
 int main(void) {
     // set constants and initial conditions:
-    double dt = 0.01;
-    double t = 0.0;
+    double t_init = 0.0;
+    double dt_init = 0.0001;
+    double* t = &t_init;
+    double* dt = &dt_init;
+    int status;
 
     // lddp
     cons_ddp_t* c_lddp = (cons_ddp_t*)malloc(sizeof(cons_ddp_t));
@@ -66,6 +69,7 @@ int main(void) {
     int i = 0;
     for (double j = 0; j < gamma_step; j += gamma_step) {
         gamma_arr[i] = gamma_start + j * gamma_step;
+        i++;
     }
 
     // dp
@@ -78,13 +82,28 @@ int main(void) {
 
     double *lddp_traj = (double*)malloc(2*COMPUTE_STEPS*sizeof(double));
 
-    // i < 2*COMPUTE_STEPS;
-    for (int i = 0; i < 10; i+=2) {
-        dt = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
-        t += dt;
-        lddp_traj[i] = s_lddp->phi;
-        lddp_traj[i+1] = s_lddp->omega;
+    i = 0;
+    int j = 0;
+    while (j < 20) {
+        j++;
+        status = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
+        if (status == EXIT_SUCCESS) {
+            lddp_traj[i] = s_lddp->phi;
+            lddp_traj[i+1] = s_lddp->omega;
+            i += 2;
+            printf("SUCCESS\n");
+        } else {continue;}
     }
+
+    // int i;
+    // while (i < 2*COMPUTE_STEPS) {
+    //     status = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
+    //     if (status == EXIT_SUCCESS) {
+    //         lddp_traj[i] = s_lddp->phi;
+    //         lddp_traj[i+1] = s_lddp->omega;
+    //         i += 2;
+    //     }
+    // }
 
     // // initialize array to store convergence steps
     // double lddp_lyp_con[6000];

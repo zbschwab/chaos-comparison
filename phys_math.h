@@ -70,13 +70,13 @@ deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's phase space trajectory with RK45 integration algorithm
-double rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+int rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
 
 // calculate one step of qddp's phase space trajectory with RK45 integration algorithm
-double rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);
+int rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
 
 // calculate one step of dp's phase space trajectory with RK45 integration algorithm
-double rk45_dp_step(state_dp_t *s, cons_dp_t *c, double dt);
+int rk45_dp_step(state_dp_t *s, cons_dp_t *c, double *t, double *dt);
 
 // takes lddp state and returns jacobian matrix (local linearization)
 double* jac_lddp(state_ddp_t *s, cons_ddp_t *c);
