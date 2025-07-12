@@ -55,10 +55,14 @@ typedef struct deriv_dp {
     double d2theta_2;
 } deriv_dp_t;
 
+// RK45 integrator step return struct (next state, normed error)
+typedef struct step {
+    double* s_next;
+    double err;
+} step_t;
+
 // signum function
 int sgn(double val);
-
-// L2 norm ??
 
 // takes lddp state and returns derivative of each state variable
 deriv_ddp_t deriv_lddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
@@ -70,7 +74,7 @@ deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's phase space trajectory with RK45 integration algorithm
-int rk45_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
+void rk45_lddp_step(step_t* next, state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
 
 // calculate one step of qddp's phase space trajectory with RK45 integration algorithm
 int rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
@@ -88,7 +92,7 @@ double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t);
 double* jac_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's deviation vector with a LTM (linearized tangent map) using RK45
-double rk45_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double t, double dt, double gamma);
+int rk45_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double *dt);
 
 // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45
 // double rk45_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);

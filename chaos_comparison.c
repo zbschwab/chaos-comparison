@@ -8,19 +8,16 @@
 #include "phys_math.h"
 #include "butcher_tableau.h"
 
+#define PI 3.1415927
+#define EXP 0.2
+
 #define COMPUTE_STEPS 1000000
 #define GAMMA_STEPS 100
-#define PI 3.1415927
+#define THETA_STEPS 360  // range is 180, increment by 0.5 deg
+
 
 int main(void) {
-    // set constants and initial conditions:
-    double t_init = 0.0;
-    double dt_init = 0.0001;
-    double* t = &t_init;
-    double* dt = &dt_init;
-    int status;
-
-    // lddp
+    // set initial system conditions: lddp
     cons_ddp_t* c_lddp = (cons_ddp_t*)malloc(sizeof(cons_ddp_t));
     state_ddp_t* s_lddp = (state_ddp_t*)malloc(sizeof(state_ddp_t));;
     double* lddp_jac = (double*)malloc(sizeof(double));
@@ -32,7 +29,7 @@ int main(void) {
     s_lddp->phi = 0.0;
     s_lddp->omega = 0.0;
 
-    // qddp
+    // set initial system conditions: qddp
     cons_ddp_t* c_qddp = (cons_ddp_t*)malloc(sizeof(cons_ddp_t));
     state_ddp_t* s_qddp = (state_ddp_t*)malloc(sizeof(state_ddp_t));;
     double* qddp_jac = (double*)malloc(sizeof(double));
@@ -44,7 +41,7 @@ int main(void) {
     s_qddp->phi = 2.0;
     s_qddp->omega = 2.0;
 
-    // dp
+    // set initial system conditions: dp
     cons_dp_t* c_dp = (cons_dp_t*)malloc(sizeof(cons_dp_t));
     state_dp_t* s_dp = (state_dp_t*)malloc(sizeof(state_dp_t));;
     double* dp_jac = (double*)malloc(sizeof(double));
@@ -59,65 +56,80 @@ int main(void) {
     s_dp->omega_1 = 2.0;
     s_dp->omega_2 = 2.0;
     
-    // make pertubation parameter arrays:
-    // lddp + qddp
-    double gamma_arr[GAMMA_STEPS] = {0};
+    // make lddp + qddp perturbation param arrays (gamma = forcing constant)
+    double gamma_arr[GAMMA_STEPS];
     double gamma_start = 1.0;
     double gamma_stop = 1.1;
     double gamma_step = (gamma_stop - gamma_start)/(GAMMA_STEPS - 1);
 
-    int i = 0;
-    for (double j = 0; j < gamma_step; j += gamma_step) {
-        gamma_arr[i] = gamma_start + j * gamma_step;
-        i++;
+    for (int i = 0; i < GAMMA_STEPS; i++) {
+        gamma_arr[i] = gamma_start + i * gamma_step;
     }
 
-    // dp
+    // make dp perturbation param arrays (initial angles of release)
+    double theta_1[THETA_STEPS], theta_2[THETA_STEPS];
+    float theta_step = 180.0 / THETA_STEPS;
 
-    // test:
+    for (int i = 0; i < THETA_STEPS; i++) {
+        theta_1[i] = i * theta_step;
+        theta_2[i] = i * theta_step;
+    }
 
-    lddp_jac = jac_lddp(s_lddp, c_lddp);
+    // lddp initial deviation vector (arbitrary normed vector, 2x2 matrix)
+    double* d_lddp = (double*)calloc(4, sizeof(double));
+    d_lddp[0] = 1e-8;
 
-    printf(" %lf ", *lddp_jac);
+    // qddp initial deviation vector (2x2 matrix)
+    double* d_qddp = (double*)calloc(4, sizeof(double));
+    d_qddp[0] = 1e-8;
+    
+    // dp initial deviation vector (4x4 matrix)
+    double* d_dp = (double*)calloc(16, sizeof(double));
+    d_dp[0] = 1e-8;
 
+    // initial integrator conditions + setup
+    double t_init = 0.0;
+    double dt_init = 0.0001;
+    double* t = &t_init;
+    double* dt = &dt_init;
+    int traj_status, dev_status;
+    double traj_err, dev_err, err;
+    step_t* traj_step = (step_t*)malloc(sizeof(step_t));
+    step_t* dev_step = (step_t*)malloc(sizeof(step_t));
+
+    // trajectory step arrays (position, velocity)
     double *lddp_traj = (double*)malloc(2*COMPUTE_STEPS*sizeof(double));
+    double *qddp_traj = (double*)malloc(2*COMPUTE_STEPS*sizeof(double));
+    double *dp_traj = (double*)malloc(4*COMPUTE_STEPS*sizeof(double));
 
-    i = 0;
-    int j = 0;
-    while (j < 20) {
-        j++;
-        status = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
-        if (status == EXIT_SUCCESS) {
+    // calculate a singular max lyapunov exponent: lddp
+    int i = 0;
+    traj_step->s_next = (double*)malloc(2*sizeof(double));
+    dev_step->s_next = (double*)malloc(4*sizeof(double));
+
+    while (i < COMPUTE_STEPS) {
+        rk45_lddp_step(traj_step, s_lddp, c_lddp, t, dt, gamma_arr[1]);
+        dev_step = rk45_LTM_lddp_step(s_lddp, c_lddp, d_lddp, dt);
+        err = fmax(traj_step->err, dev_step->err);
+        if (err < 1.0) {
+            // accept step
+            *t += (*dt);
+            s_lddp = traj_step->s_next; // does this even work?
+            d_lddp = dev_step->s_next;
+
+            // compute new dt (w/ safety clamp)
+            double factor = 0.9 * pow(1.0 / err, EXP);
+            if (factor < 1.0) {factor = 1.0;}
+            if (factor > 5.0) {factor = 5.0;}
+            (*dt) *= factor;
+
+            // save accepted trajectory and increment loop
             lddp_traj[i] = s_lddp->phi;
             lddp_traj[i+1] = s_lddp->omega;
             i += 2;
-            printf("SUCCESS\n");
-        } else {continue;}
+            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, %lf, %lf\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], d_lddp[2], d_lddp[3]);
+        } else {printf("failure.\n");}
     }
-
-    // int i;
-    // while (i < 2*COMPUTE_STEPS) {
-    //     status = rk45_lddp_step(s_lddp, c_lddp, t, dt, 1.1);
-    //     if (status == EXIT_SUCCESS) {
-    //         lddp_traj[i] = s_lddp->phi;
-    //         lddp_traj[i+1] = s_lddp->omega;
-    //         i += 2;
-    //     }
-    // }
-
-    // // initialize array to store convergence steps
-    // double lddp_lyp_con[6000];
-
-    // for (int i = 0; i < COMPUTE_STEPS; i++) {
-    //     lddp_lyp_con[i] = 
-    //     t_step = jac_lddp(s_lddp, c_lddp, t_step);
-    //     //printf(" %lf ", lddp_jac[i]);
-    // }
-
-    // qddp
-
-
-    // dp
 
     // // write data to csv
     // FILE *lddp_file;
