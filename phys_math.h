@@ -55,11 +55,31 @@ typedef struct deriv_dp {
     double d2theta_2;
 } deriv_dp_t;
 
-// RK45 integrator step return struct (next state, normed error)
-typedef struct step {
-    double* s_next;
+// RK45 ddp traj step return struct (next state, normed error)
+typedef struct traj_step_ddp {
+    state_ddp_t s_next;
     double err;
-} step_t;
+} traj_step_ddp_t;
+
+// RK45 ddp dev vec step return struct (next state, normed error)
+typedef struct dev_step_ddp {
+    double d_next[2];
+    double err;
+    double norm;
+} dev_step_ddp_t;
+
+// RK45 dp traj step return struct (next state, normed error)
+typedef struct traj_step_dp {
+    state_dp_t s_next;
+    double err;
+} traj_step_dp_t;
+
+// RK45 dp dev vec step return struct (next state, normed error)
+typedef struct dev_step_dp {
+    double d_next[16];
+    double err;
+    double norm;
+} dev_step_dp_t;
 
 // signum function
 int sgn(double val);
@@ -74,7 +94,7 @@ deriv_ddp_t deriv_qddp(state_ddp_t *s, cons_ddp_t *c, double t, double gamma);
 deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's phase space trajectory with RK45 integration algorithm
-void rk45_lddp_step(step_t* next, state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
+void rk45_lddp_step(traj_step_ddp_t* next, state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
 
 // calculate one step of qddp's phase space trajectory with RK45 integration algorithm
 int rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma);
@@ -92,7 +112,7 @@ double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t);
 double* jac_dp(state_dp_t *s, cons_dp_t *c);
 
 // calculate one step of lddp's deviation vector with a LTM (linearized tangent map) using RK45
-int rk45_LTM_lddp_step(state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double *dt);
+void rk45_LTM_lddp_step(dev_step_ddp_t *next, state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double *dt);
 
 // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45
 // double rk45_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma);

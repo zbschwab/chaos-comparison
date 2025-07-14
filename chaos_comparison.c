@@ -62,9 +62,12 @@ int main(void) {
     double gamma_stop = 1.1;
     double gamma_step = (gamma_stop - gamma_start)/(GAMMA_STEPS - 1);
 
+    printf("gamma_arr:\n");
     for (int i = 0; i < GAMMA_STEPS; i++) {
         gamma_arr[i] = gamma_start + i * gamma_step;
+        printf(" %lf ", gamma_arr[i]);
     }
+    printf("\n\n");
 
     // make dp perturbation param arrays (initial angles of release)
     double theta_1[THETA_STEPS], theta_2[THETA_STEPS];
@@ -75,15 +78,15 @@ int main(void) {
         theta_2[i] = i * theta_step;
     }
 
-    // lddp initial deviation vector (arbitrary normed vector, 2x2 matrix)
-    double* d_lddp = (double*)calloc(4, sizeof(double));
+    // lddp initial deviation vector (arbitrary normed vector, 2x1 vector)
+    double* d_lddp = (double*)calloc(2, sizeof(double));
     d_lddp[0] = 1e-8;
 
-    // qddp initial deviation vector (2x2 matrix)
+    // qddp initial deviation vector (2x1 vector)
     double* d_qddp = (double*)calloc(4, sizeof(double));
     d_qddp[0] = 1e-8;
     
-    // dp initial deviation vector (4x4 matrix)
+    // dp initial deviation vector (4x1 vector)
     double* d_dp = (double*)calloc(16, sizeof(double));
     d_dp[0] = 1e-8;
 
@@ -92,10 +95,7 @@ int main(void) {
     double dt_init = 0.0001;
     double* t = &t_init;
     double* dt = &dt_init;
-    int traj_status, dev_status;
     double traj_err, dev_err, err;
-    step_t* traj_step = (step_t*)malloc(sizeof(step_t));
-    step_t* dev_step = (step_t*)malloc(sizeof(step_t));
 
     // trajectory step arrays (position, velocity)
     double *lddp_traj = (double*)malloc(2*COMPUTE_STEPS*sizeof(double));
@@ -104,33 +104,44 @@ int main(void) {
 
     // calculate a singular max lyapunov exponent: lddp
     int i = 0;
-    traj_step->s_next = (double*)malloc(2*sizeof(double));
-    dev_step->s_next = (double*)malloc(4*sizeof(double));
+    traj_step_ddp_t* traj_step = (traj_step_ddp_t*)malloc(sizeof(traj_step_ddp_t));
+    dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
+    double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
 
-    while (i < COMPUTE_STEPS) {
-        rk45_lddp_step(traj_step, s_lddp, c_lddp, t, dt, gamma_arr[1]);
-        dev_step = rk45_LTM_lddp_step(s_lddp, c_lddp, d_lddp, dt);
+    while (i < 50) { //COMPUTE_STEPS
+        rk45_lddp_step(traj_step, s_lddp, c_lddp, t, dt, gamma_arr[73]);
+        rk45_LTM_lddp_step(dev_step, s_lddp, c_lddp, d_lddp, dt);
+        if (fmax(traj_step->err, dev_step->err) == dev_step->err) {
+            printf("dev: ");
+        } else {printf("traj: ");}
         err = fmax(traj_step->err, dev_step->err);
+
+        // compute new dt (w/ safety clamp)
+        double factor = 0.9 * pow(1.0 / err, EXP);
+        if (factor < 0.1) {factor = 0.1;}
+        if (factor > 5.0) {factor = 5.0;}
+        (*dt) *= factor;
+
         if (err < 1.0) {
             // accept step
             *t += (*dt);
-            s_lddp = traj_step->s_next; // does this even work?
-            d_lddp = dev_step->s_next;
-
-            // compute new dt (w/ safety clamp)
-            double factor = 0.9 * pow(1.0 / err, EXP);
-            if (factor < 1.0) {factor = 1.0;}
-            if (factor > 5.0) {factor = 5.0;}
-            (*dt) *= factor;
+            *s_lddp = traj_step->s_next;
+            memcpy(d_lddp, dev_step->d_next, 2*sizeof(double));
 
             // save accepted trajectory and increment loop
             lddp_traj[i] = s_lddp->phi;
             lddp_traj[i+1] = s_lddp->omega;
             i += 2;
-            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, %lf, %lf\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], d_lddp[2], d_lddp[3]);
-        } else {printf("failure.\n");}
+            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1]);
+            
+            // update accumulated norm (max lyapunov sum)
+            *maxlyp_sum_lddp += log(dev_step->norm);
+            printf("maxlyp_sum: %lf\n", *maxlyp_sum_lddp);
+        } else {
+            printf("max err = %lf\n", err);
+        }
     }
-
+    
     // // write data to csv
     // FILE *lddp_file;
 
