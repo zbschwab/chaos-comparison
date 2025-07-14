@@ -442,6 +442,10 @@ void rk45_LTM_lddp_step(dev_step_ddp_t* next, state_ddp_t *s, cons_ddp_t *c, dou
         b5[i] = dev_vec[i] + (*dt) * (B1 * k1[i] + B3 * k3[i] + B4 * k4[i] + B5 * k5[i] + B6 * k6[i] + B7 * k7[i]);
     }
 
+    // renorm step
+    double norm = sqrt(pow(b5[0], 2) + pow(b5[1], 2));
+    next->norm = norm;
+
     // compute + norm truncation error
     double scale[2], e[2];
     double err_norm = 0;
@@ -454,24 +458,19 @@ void rk45_LTM_lddp_step(dev_step_ddp_t* next, state_ddp_t *s, cons_ddp_t *c, dou
         e[i] = (b5[i] - b4[i]) / scale[i];
         err_norm += pow(e[i], 2);
     }
-
     err_norm = sqrt(err_norm / 2.0);
 
-    // renorm step
-    double norm = sqrt(pow(b5[0], 2) + pow(b5[1], 2));
+    // norm b5 for reuse as deviation vector
     for (int i = 0; i < 2; i++) {
         b5[i] /= norm;
     }
 
-    
-    
     // update step
     for (int i = 0; i < 2; i++) {
         next->d_next[i] = b5[i];
     }
     next->err = err_norm;
-    next->norm = norm;
-
+    
 }
 
 // // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45

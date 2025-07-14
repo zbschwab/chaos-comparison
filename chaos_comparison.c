@@ -80,7 +80,7 @@ int main(void) {
 
     // lddp initial deviation vector (arbitrary normed vector, 2x1 vector)
     double* d_lddp = (double*)calloc(2, sizeof(double));
-    d_lddp[0] = 1e-8;
+    d_lddp[0] = 1.0e-8; //1.0;
 
     // qddp initial deviation vector (2x1 vector)
     double* d_qddp = (double*)calloc(4, sizeof(double));
@@ -92,7 +92,7 @@ int main(void) {
 
     // initial integrator conditions + setup
     double t_init = 0.0;
-    double dt_init = 0.0001;
+    double dt_init = 3.8e-7; //0.0001;
     double* t = &t_init;
     double* dt = &dt_init;
     double traj_err, dev_err, err;
@@ -108,7 +108,7 @@ int main(void) {
     dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
     double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
 
-    while (i < 50) { //COMPUTE_STEPS
+    while (i < COMPUTE_STEPS) { //COMPUTE_STEPS
         rk45_lddp_step(traj_step, s_lddp, c_lddp, t, dt, gamma_arr[73]);
         rk45_LTM_lddp_step(dev_step, s_lddp, c_lddp, d_lddp, dt);
         if (fmax(traj_step->err, dev_step->err) == dev_step->err) {
@@ -132,16 +132,16 @@ int main(void) {
             lddp_traj[i] = s_lddp->phi;
             lddp_traj[i+1] = s_lddp->omega;
             i += 2;
-            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1]);
+            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, dt = %.10e\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], *dt);
             
             // update accumulated norm (max lyapunov sum)
             *maxlyp_sum_lddp += log(dev_step->norm);
-            printf("maxlyp_sum: %lf\n", *maxlyp_sum_lddp);
+            printf("maxlyp_sum: %.10e\n", *maxlyp_sum_lddp);
         } else {
             printf("max err = %lf\n", err);
         }
     }
-    
+
     // // write data to csv
     // FILE *lddp_file;
 
