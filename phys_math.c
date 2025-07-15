@@ -68,59 +68,156 @@ deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c) {
 }
 
 // integration step w/ adaptive RK45 alg for lddp
-void rk45_lddp_step(traj_step_ddp_t* next, state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double gamma) {
-    deriv_ddp_t k1, k2, k3, k4, k5, k6, k7;
-    state_ddp_t temp = *s;
-    state_ddp_t b4, b5;
+void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t *s, double *dev_vec, cons_ddp_t *c, double *t, double *dt, double gamma) {
+    deriv_ddp_t s_k1, s_k2, s_k3, s_k4, s_k5, s_k6, s_k7;
+    double d_k1[2], d_k2[2], d_k3[2], d_k4[2], d_k5[2], d_k6[2], d_k7[2], d_b4[2], d_b5[2], d_temp[2];
+    state_ddp_t s_temp = *s;
+    state_ddp_t s_b4, s_b5;
+    double* jac;
 
-    k1 = deriv_lddp(s, c, *t, gamma);
+    // compute trajectory estimate and deviation vector
+    // k1
+    s_k1 = deriv_lddp(s, c, *t, gamma);
+    memcpy(d_k1, jac_lddp(*s, c), 2*sizeof(double));
 
-    temp.phi = s->phi + A12 * k1.dphi;
-    temp.omega = s->omega + A12 * k1.d2phi;
-    k2 = deriv_lddp(&temp, c, *t + C2*(*dt), gamma);
+    // k2
+    s_temp.phi = s->phi + A12 * s_k1.dphi;
+    s_temp.omega = s->omega + A12 * s_k1.d2phi;
+    cblas_daxpy(2, A12 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
+                        dev_vec, 1,
+                BETA,   d_k2, 1);
+    s_k2 = deriv_lddp(&s_temp, c, *t + C2*(*dt), gamma);
 
-    temp.phi = s->phi + A13 * k1.dphi + A23 * k2.dphi;
-    temp.omega = s->omega + A13 * k1.d2phi + A23 * k2.d2phi;
-    k3 = deriv_lddp(&temp, c, *t + C3*(*dt), gamma);
+    // k3
+    s_temp.phi = s->phi + A13 * s_k1.dphi + A23 * s_k2.dphi;
+    s_temp.omega = s->omega + A13 * s_k1.d2phi + A23 * s_k2.d2phi;
+    memcpy(d_temp, dev_vec, 2*sizeof(double));
+    cblas_daxpy(2, A13 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A23 * (*dt), d_k2, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
+                        d_temp, 1,
+                BETA,   d_k3, 1);
+    s_k3 = deriv_lddp(&s_temp, c, *t + C3*(*dt), gamma);
 
-    temp.phi = s->phi + A14 * k1.dphi + A24 * k2.dphi + A34 * k3.dphi;
-    temp.omega = s->omega + A14 * k1.d2phi + A24 * k2.d2phi + A34 * k3.d2phi;
-    k4 = deriv_lddp(&temp, c, *t + C4*(*dt), gamma);
+    // k4
+    s_temp.phi = s->phi + A14 * s_k1.dphi + A24 * s_k2.dphi + A34 * s_k3.dphi;
+    s_temp.omega = s->omega + A14 * s_k1.d2phi + A24 * s_k2.d2phi + A34 * s_k3.d2phi;
+    memcpy(d_temp, dev_vec, 2*sizeof(double));
+    cblas_daxpy(2, A14 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A24 * (*dt), d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A34 * (*dt), d_k3, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
+                        d_temp, 1,
+                BETA,   d_k4, 1);
+    s_k4 = deriv_lddp(&s_temp, c, *t + C4*(*dt), gamma);
 
-    temp.phi = s->phi + A15 * k1.dphi + A25 * k2.dphi + A35 * k3.dphi + A45 * k4.dphi;
-    temp.omega = s->omega + A15 * k1.d2phi + A25 * k2.d2phi + A35 * k3.d2phi + A45 * k4.d2phi;
-    k5 = deriv_lddp(&temp, c, *t + C5*(*dt), gamma);
+    // k5
+    s_temp.phi = s->phi + A15 * s_k1.dphi + A25 * s_k2.dphi + A35 * s_k3.dphi + A45 * s_k4.dphi;
+    s_temp.omega = s->omega + A15 * s_k1.d2phi + A25 * s_k2.d2phi + A35 * s_k3.d2phi + A45 * s_k4.d2phi;
+    memcpy(d_temp, dev_vec, 2*sizeof(double));
+    cblas_daxpy(2, A15 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A25 * (*dt), d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A35 * (*dt), d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A45 * (*dt), d_k4, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac, 2,
+                        d_temp, 1,
+                BETA,   d_k4, 1);
+    s_k5 = deriv_lddp(&s_temp, c, *t + C5*(*dt), gamma);
 
-    temp.phi = s->phi + A16 * k1.dphi + A26 * k2.dphi + A36 * k3.dphi + A46 * k4.dphi + A56 * k5.dphi;
-    temp.omega = s->omega + A16 * k1.d2phi + A26 * k2.d2phi + A36 * k3.d2phi + A46 * k4.d2phi + A56 * k5.d2phi;
-    k6 = deriv_lddp(&temp, c, *t + C6*(*dt), gamma);
+    // k6
+    s_temp.phi = s->phi + A16 * s_k1.dphi + A26 * s_k2.dphi + A36 * s_k3.dphi + A46 * s_k4.dphi + A56 * s_k5.dphi;
+    s_temp.omega = s->omega + A16 * s_k1.d2phi + A26 * s_k2.d2phi + A36 * s_k3.d2phi + A46 * s_k4.d2phi + A56 * s_k5.d2phi;
+    memcpy(d_temp, dev_vec, 2*sizeof(double));
+    cblas_daxpy(2, A16 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A26 * (*dt), d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A36 * (*dt), d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A46 * (*dt), d_k4, 1, d_temp, 1);
+    cblas_daxpy(2, A56 * (*dt), d_k5, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
+                        d_temp, 1,
+                BETA,   d_k5, 1);
+    s_k6 = deriv_lddp(&s_temp, c, *t + C6*(*dt), gamma);
 
-    temp.phi = s->phi + A17 * k1.dphi + A37 * k3.dphi + A47 * k4.dphi + A57 * k5.dphi + A67 * k6.dphi;
-    temp.omega = s->omega + A17 * k1.d2phi + A37 * k3.d2phi + A47 * k4.d2phi + A57 * k5.d2phi + A67 * k6.d2phi;
-    k7 = deriv_lddp(&temp, c, *t + C7*(*dt), gamma);
+    // k7
+    s_temp.phi = s->phi + A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi;
+    s_temp.omega = s->omega + A17 * s_k1.d2phi + A37 * s_k3.d2phi + A47 * s_k4.d2phi + A57 * s_k5.d2phi + A67 * s_k6.d2phi;
+    memcpy(d_temp, dev_vec, 2*sizeof(double));
+    cblas_daxpy(2, A17 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A37 * (*dt), d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A47 * (*dt), d_k4, 1, d_temp, 1);
+    cblas_daxpy(2, A57 * (*dt), d_k5, 1, d_temp, 1);
+    cblas_daxpy(2, A67 * (*dt), d_k6, 1, d_temp, 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans,
+                2, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
+                        d_temp, 1,
+                BETA,   d_k7, 1);
+    s_k7 = deriv_lddp(&s_temp, c, *t + C7*(*dt), gamma);
 
-    // 4th-order estimate
-    b4.phi = s->phi + (*dt) * (A17 * k1.dphi + A37 * k3.dphi + A47 * k4.dphi + A57 * k5.dphi + A67 * k6.dphi);
-    b4.omega = s->omega + (*dt) * (A17 * k1.d2phi + A37 * k3.d2phi + A47 * k4.d2phi + A57 * k5.d2phi + A67 * k6.d2phi);
-
-    // 5th-order estimate
-    b5.phi = s->phi + (*dt) * (B1 * k1.dphi + B3 * k3.dphi + B4 * k4.dphi + B5 * k5.dphi + B6 * k6.dphi + B7 * k7.dphi);
-    b5.omega = s->omega + (*dt) * (B1 * k1.d2phi + B3 * k3.d2phi + B4 * k4.d2phi + B5 * k5.d2phi + B6 * k6.d2phi + B7 * k7.d2phi);
+    // 4th-order trajectory estimate
+    s_b4.phi = s->phi + (*dt) * (A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi);
+    s_b4.omega = s->omega + (*dt) * (A17 * s_k1.d2phi + A37 * s_k3.d2phi + A47 * s_k4.d2phi + A57 * s_k5.d2phi + A67 * s_k6.d2phi);
+    // 5th-order trajectory estimate
+    s_b5.phi = s->phi + (*dt) * (B1 * s_k1.dphi + B3 *s_k3.dphi + B4 * s_k4.dphi + B5 * s_k5.dphi + B6 * s_k6.dphi + B7 * s_k7.dphi);
+    s_b5.omega = s->omega + (*dt) * (B1 * s_k1.d2phi + B3 * s_k3.d2phi + B4 * s_k4.d2phi + B5 * s_k5.d2phi + B6 * s_k6.d2phi + B7 * s_k7.d2phi);
     
-    // compute + norm truncation error
+    // 4th and 5th-order deviation vector estimate
+    for (int i = 0; i < 2; i++) {
+        d_b4[i] = dev_vec[i] + (*dt) * (A17 * d_k1[i] + A37 * d_k3[i] + A47 * d_k4[i] + A57 * d_k5[i] + A67 * d_k6[i]);
+        d_b5[i] = dev_vec[i] + (*dt) * (B1 * d_k1[i] + B3 * d_k3[i] + B4 * d_k4[i] + B5 * d_k5[i] + B6 * d_k6[i] + B7 * d_k7[i]);
+    }
+
+    // compute + norm trajectory truncation error
     double scale_phi = ATOL + RTOL * fabs(s->phi);
     double scale_omega = ATOL + RTOL * fabs(s->omega);
     if (scale_phi < 1e-14) scale_phi = 1e-14;
     if (scale_omega < 1e-14) scale_omega = 1e-14;
 
-    double e0 = (b5.phi - b4.phi) / scale_phi;
-    double e1 = (b5.omega - b4.omega) / scale_omega;
+    double e0 = (s_b5.phi - s_b4.phi) / scale_phi;
+    double e1 = (s_b5.omega - s_b4.omega) / scale_omega;
 
-    double err_norm = sqrt((e0*e0 + e1*e1) / 2.0);
+    // update trajectory step
+    s_next->err = sqrt((e0*e0 + e1*e1) / 2.0);
+    s_next->next = s_b5;
 
-    // update step
-    next->s_next = b5;
-    next->err = err_norm;
+    // renorm deviation vector
+    double norm = sqrt(d_b5[0]*d_b5[0] + d_b5[1]*d_b5[1]);
+    d_next->norm = norm;
+
+    // compute + norm truncation error
+    double scale[2], e[2];
+    double err_norm = 0;
+
+    for (int i = 0; i < 2; i++) {
+        scale[i] = ATOL + RTOL * fmax(fabs(d_b4[i]), fabs(d_b5[i]));
+        if (scale[i] < 1e-14) {
+            scale[i] = 1e-14;
+        }
+        e[i] = (d_b5[i] - d_b4[i]) / scale[i];
+        err_norm += pow(e[i], 2);
+    }
+    d_next->err = sqrt(err_norm / 2.0);
+
+    // norm b5 for reuse as deviation vector
+    for (int i = 0; i < 2; i++) {
+        d_b5[i] /= norm;
+    }
+
+    // update deviation vector step
+    for (int i = 0; i < 2; i++) {
+        d_next->next[i] = d_b5[i];
+    }
 
 }
 
@@ -294,23 +391,23 @@ int rk45_dp_step(state_dp_t *s, cons_dp_t *c, double *t, double *dt) {
 }
 
 // takes lddp state and returns jacobian matrix (local linearization)
-double* jac_lddp(state_ddp_t *s, cons_ddp_t *c) {
+double* jac_lddp(state_ddp_t s, cons_ddp_t *c) {
     double* jac = (double*)calloc(4, sizeof(double));
     jac[0] = 0;
     jac[1] = 1;
-    jac[2] = - pow(c->omega0, 2) * cos(s->phi);
+    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
     jac[3] = - 2 * c->beta;
 
     return jac;
 }
 
 // takes qddp state and returns jacobian matrix (local linearization)
-double* jac_qddp(state_ddp_t *s, cons_ddp_t *c, double t) {
+double* jac_qddp(state_ddp_t s, cons_ddp_t *c, double t) {
     double* jac = (double*)calloc(4, sizeof(double));
     jac[0] = 0;
     jac[1] = 1;
-    jac[2] = - pow(c->omega0, 2) * cos(s->phi);
-    jac[3] = - 4 * c->beta * sin(s->omega) * s->omega;
+    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
+    jac[3] = - 4 * c->beta * sin(s.omega) * s.omega;
 
     return jac;
 }
@@ -345,133 +442,6 @@ double* jac_dp(state_dp_t *s, cons_dp_t *c) {
     return jac;
 }
 
-// calculate one step of lddp's deviation vector with a LTM (linearized tangent map) using RK45
-void rk45_LTM_lddp_step(dev_step_ddp_t* next, state_ddp_t *s, cons_ddp_t *c, double *dev_vec, double *dt) {
-    double* jac;
-    double k1[2], k2[2], k3[2], k4[2], k5[2], k6[2], k7[2], b4[2], b5[2], temp[2];
-
-    // pointer to 4-len array representing 2x2 matrix
-    jac = jac_lddp(s, c);
-    printf("jac = [%lf, %lf; %lf, %lf]\n", jac[0], jac[1], jac[2], jac[3]);
-
-
-    // jac x dev_vec = k1 (matrix-matrix multiplication)
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        dev_vec, 1,
-                BETA,   k1, 1);
-
-    // dev_vec + k1 * A12 * dt = temp (scalar-matrix multiplication)
-    // jac x temp = k2
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A12 * (*dt), k1, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k2, 1);
-    
-    // dev_vec + dt * (k1 * A13 + k2 * A23) = temp
-    // jac x temp = k3
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A13 * (*dt), k1, 1, temp, 1);
-    cblas_daxpy(2, A23 * (*dt), k2, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k3, 1);
-
-    // dev_vec + dt * (k1 * A14 + k2 * A24 + k3 * A34) = temp
-    // jac x temp = k4
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A14 * (*dt), k1, 1, temp, 1);
-    cblas_daxpy(2, A24 * (*dt), k2, 1, temp, 1);
-    cblas_daxpy(2, A34 * (*dt), k3, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k4, 1);
-    
-    // dev_vec + dt * (k1 * A15 + k2 * A25 + k3 * A35 + k4 * A45) = temp
-    // jac x temp = k5
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A15 * (*dt), k1, 1, temp, 1);
-    cblas_daxpy(2, A25 * (*dt), k2, 1, temp, 1);
-    cblas_daxpy(2, A35 * (*dt), k3, 1, temp, 1);
-    cblas_daxpy(2, A45 * (*dt), k4, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k5, 1);
-
-    // dev_vec + dt * (k1 * A16 + k2 * A26 + k3 * A36 + k4 * A46 + k5 * A56) = temp
-    // jac x temp = k6
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A16 * (*dt), k1, 1, temp, 1);
-    cblas_daxpy(2, A26 * (*dt), k2, 1, temp, 1);
-    cblas_daxpy(2, A36 * (*dt), k3, 1, temp, 1);
-    cblas_daxpy(2, A46 * (*dt), k4, 1, temp, 1);
-    cblas_daxpy(2, A56 * (*dt), k5, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k6, 1);
-
-    // dev_vec + dt * (k1 * A17 + k3 * A37 + k4 * A47 + k5 * A57 + k6 * A67) = temp
-    // jac x temp = k7
-    memcpy(temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A17 * (*dt), k1, 1, temp, 1);
-    cblas_daxpy(2, A37 * (*dt), k3, 1, temp, 1);
-    cblas_daxpy(2, A47 * (*dt), k4, 1, temp, 1);
-    cblas_daxpy(2, A57 * (*dt), k5, 1, temp, 1);
-    cblas_daxpy(2, A67 * (*dt), k6, 1, temp, 1);
-    cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                2, 2,
-                ALPHA,  jac, 2,
-                        temp, 1,
-                BETA,   k7, 1);
-
-    // 4th and 5th-order estimate
-    for (int i = 0; i < 2; i++) {
-        b4[i] = dev_vec[i] + (*dt) * (A17 * k1[i] + A37 * k3[i] + A47 * k4[i] + A57 * k5[i] + A67 *k6[i]);
-        b5[i] = dev_vec[i] + (*dt) * (B1 * k1[i] + B3 * k3[i] + B4 * k4[i] + B5 * k5[i] + B6 * k6[i] + B7 * k7[i]);
-    }
-
-    // renorm step
-    double norm = sqrt(pow(b5[0], 2) + pow(b5[1], 2));
-    next->norm = norm;
-
-    // compute + norm truncation error
-    double scale[2], e[2];
-    double err_norm = 0;
-
-    for (int i = 0; i < 2; i++) {
-        scale[i] = ATOL + RTOL * fabs(jac[i]);
-        if (scale[i] < 1e-14) {
-            scale[i] = 1e-14;
-        }
-        e[i] = (b5[i] - b4[i]) / scale[i];
-        err_norm += pow(e[i], 2);
-    }
-    err_norm = sqrt(err_norm / 2.0);
-
-    // norm b5 for reuse as deviation vector
-    for (int i = 0; i < 2; i++) {
-        b5[i] /= norm;
-    }
-
-    // update step
-    for (int i = 0; i < 2; i++) {
-        next->d_next[i] = b5[i];
-    }
-    next->err = err_norm;
-    
-}
 
 // // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45
 // double rk45_LTM_qddp_step(state_ddp_t *s, cons_ddp_t *c, double t, double dt, double gamma) {

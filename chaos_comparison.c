@@ -62,12 +62,12 @@ int main(void) {
     double gamma_stop = 1.1;
     double gamma_step = (gamma_stop - gamma_start)/(GAMMA_STEPS - 1);
 
-    printf("gamma_arr:\n");
-    for (int i = 0; i < GAMMA_STEPS; i++) {
-        gamma_arr[i] = gamma_start + i * gamma_step;
-        printf(" %lf ", gamma_arr[i]);
-    }
-    printf("\n\n");
+    // printf("gamma_arr:\n");
+    // for (int i = 0; i < GAMMA_STEPS; i++) {
+    //     gamma_arr[i] = gamma_start + i * gamma_step;
+    //     printf(" %lf ", gamma_arr[i]);
+    // }
+    // printf("\n\n");
 
     // make dp perturbation param arrays (initial angles of release)
     double theta_1[THETA_STEPS], theta_2[THETA_STEPS];
@@ -107,13 +107,9 @@ int main(void) {
     traj_step_ddp_t* traj_step = (traj_step_ddp_t*)malloc(sizeof(traj_step_ddp_t));
     dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
     double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
-
+    
     while (i < COMPUTE_STEPS) { //COMPUTE_STEPS
-        rk45_lddp_step(traj_step, s_lddp, c_lddp, t, dt, gamma_arr[73]);
-        rk45_LTM_lddp_step(dev_step, s_lddp, c_lddp, d_lddp, dt);
-        if (fmax(traj_step->err, dev_step->err) == dev_step->err) {
-            printf("dev: ");
-        } else {printf("traj: ");}
+        rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_arr[73]);
         err = fmax(traj_step->err, dev_step->err);
 
         // compute new dt (w/ safety clamp)
@@ -125,22 +121,28 @@ int main(void) {
         if (err < 1.0) {
             // accept step
             *t += (*dt);
-            *s_lddp = traj_step->s_next;
-            memcpy(d_lddp, dev_step->d_next, 2*sizeof(double));
+            *s_lddp = traj_step->next;
+            memcpy(d_lddp, dev_step->next, 2*sizeof(double));
 
             // save accepted trajectory and increment loop
             lddp_traj[i] = s_lddp->phi;
             lddp_traj[i+1] = s_lddp->omega;
             i += 2;
-            printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, dt = %.10e\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], *dt);
+            // printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, dt = %.10e\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], *dt);
             
             // update accumulated norm (max lyapunov sum)
             *maxlyp_sum_lddp += log(dev_step->norm);
-            printf("maxlyp_sum: %.10e\n", *maxlyp_sum_lddp);
+            if (i % 10000 == 0){
+                printf("dev = %lf, %lf, dt = %.10e\n, dev_step->err = %.10e, dev_step->norm = %.10e, maxlyp_sum: %.10e\n", d_lddp[0], d_lddp[1], *dt, dev_step->err, dev_step->norm, *maxlyp_sum_lddp);
+            }
+
         } else {
             printf("max err = %lf\n", err);
         }
     }
+
+    double maxlyp_lddp = *maxlyp_sum_lddp / *t;
+    printf("/nmaxlyp: %lf\n", maxlyp_lddp);
 
     // // write data to csv
     // FILE *lddp_file;
