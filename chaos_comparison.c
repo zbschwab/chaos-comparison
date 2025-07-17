@@ -11,7 +11,7 @@
 #define PI 3.1415927
 #define EXP 0.2
 
-#define COMPUTE_STEPS 1000000
+#define COMPUTE_STEPS 1e6
 #define GAMMA_STEPS 100
 #define THETA_STEPS 360  // range is 180, increment by 0.5 deg
 
@@ -107,16 +107,11 @@ int main(void) {
     traj_step_ddp_t* traj_step = (traj_step_ddp_t*)malloc(sizeof(traj_step_ddp_t));
     dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
     double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
-    
+    *dt = 4.8e-05;  // test, delete later
+    *dt = 1e-04;
     while (i < COMPUTE_STEPS) { //COMPUTE_STEPS
         rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_arr[73]);
         err = fmax(traj_step->err, dev_step->err);
-
-        // compute new dt (w/ safety clamp)
-        double factor = 0.9 * pow(1.0 / err, EXP);
-        if (factor < 0.1) {factor = 0.1;}
-        if (factor > 5.0) {factor = 5.0;}
-        (*dt) *= factor;
 
         if (err < 1.0) {
             // accept step
@@ -139,10 +134,16 @@ int main(void) {
         } else {
             printf("max err = %lf\n", err);
         }
+
+        // compute new dt (w/ safety clamp)
+        double factor = 0.9 * pow(1.0 / err, EXP);
+        if (factor < 0.1) {factor = 0.1;}
+        if (factor > 5.0) {factor = 5.0;}
+        (*dt) *= factor;
     }
 
     double maxlyp_lddp = *maxlyp_sum_lddp / *t;
-    printf("/nmaxlyp: %lf\n", maxlyp_lddp);
+    printf("\nmaxlyp_sum / t = maxlyp_lddp:\n%lf / %lf = %lf\n", *maxlyp_sum_lddp, *t, maxlyp_lddp);
 
     // // write data to csv
     // FILE *lddp_file;
@@ -169,5 +170,19 @@ int main(void) {
     free(c_qddp);
     free(c_dp);
 
+    free(lddp_jac);
+    free(qddp_jac);
+    free(dp_jac);
+
+    free(d_lddp);
+    free(d_qddp);
+    free(d_dp);
+
     free(lddp_traj);
+    free(qddp_traj);
+    free(dp_traj);
+
+    free(traj_step);
+    free(dev_step);
+    free(maxlyp_sum_lddp);
 }

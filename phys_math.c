@@ -128,7 +128,7 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     cblas_daxpy(2, A45 * (*dt), d_k4, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
-                ALPHA,  jac, 2,
+                ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k4, 1);
     s_k5 = deriv_lddp(&s_temp, c, *t + C5*(*dt), gamma);
@@ -188,11 +188,11 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     double e1 = (s_b5.omega - s_b4.omega) / scale_omega;
 
     // update trajectory step
-    s_next->err = sqrt((e0*e0 + e1*e1) / 2.0);
+    s_next->err = hypot(e0, e1) / M_SQRT2;
     s_next->next = s_b5;
 
     // renorm deviation vector
-    double norm = sqrt(d_b5[0]*d_b5[0] + d_b5[1]*d_b5[1]);
+    double norm = hypot(d_b5[0], d_b5[1]);
     d_next->norm = norm;
 
     // compute + norm truncation error
