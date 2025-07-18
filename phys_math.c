@@ -13,8 +13,8 @@
 
 #define ALPHA 1.0
 #define BETA 1.0
-#define ATOL 0.0001
-#define RTOL 0.001
+#define ATOL 1.0e-4
+#define RTOL 1.0e-3
 #define DT_MIN 0.00001
 
 
@@ -67,13 +67,64 @@ deriv_dp_t deriv_dp(state_dp_t *s, cons_dp_t *c) {
     return d;
 }
 
+// takes lddp state and returns jacobian matrix (local linearization)
+double* jac_lddp(state_ddp_t s, cons_ddp_t *c) {
+    double* jac = (double*)calloc(4, sizeof(double));
+    jac[0] = 0;
+    jac[1] = 1;
+    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
+    jac[3] = - 2 * c->beta;
+
+    return jac;
+}
+
+// takes qddp state and returns jacobian matrix (local linearization)
+double* jac_qddp(state_ddp_t s, cons_ddp_t *c, double t) {
+    double* jac = (double*)calloc(4, sizeof(double));
+    jac[0] = 0;
+    jac[1] = 1;
+    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
+    jac[3] = - 4 * c->beta * sin(s.omega) * s.omega;
+
+    return jac;
+}
+
+// takes dp state and returns jacobian matrix (local linearization)
+double* jac_dp(state_dp_t *s, cons_dp_t *c) {
+    double* jac = (double*)calloc(16, sizeof(double));
+    // row 1 (left to right)
+    jac[0] = 0;
+    jac[1] = 0;
+    jac[2] = 1;
+    jac[3] = 0;
+
+    // row 2 (left to right)
+    jac[4] = 0;
+    jac[5] = 0;
+    jac[6] = 0;
+    jac[7] = 1;
+
+    // row 3 (left to right)
+    jac[8] = (2 * c->m_2 * (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_2) - c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_1) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_1, 2) * c->l_1 * c->m_2 * pow(sin(s->theta_1), 2) * sin(s->theta_2) * pow(cos(s->theta_1 - s->theta_2), 2) + pow(s->omega_2, 2) * c->l_2 * c->m_2 * pow(sin(s->theta_1), 2) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2) - G * (c->m_1 + c->m_2) * sin(s->theta_2) * cos(s->theta_1) + c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * pow(sin(s->theta_1), 2) * sin(s->theta_1 - s->theta_2))) / (c->l_1 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * pow(sin(s->theta_1), 2) * sin(s->theta_2));
+    jac[9] = c->m_2 * ((-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_2, 2) * c->l_2 * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) - (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + (pow(s->omega_1, 2) * c->l_1 * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) + G * cos(s->theta_2)) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) - 2 * (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_2) - c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_1) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2)) / (c->l_1 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * sin(s->theta_1) * pow(sin(s->theta_2), 2));
+    jac[10] = 2 * s->omega_1 * c->m_2 * sin(2 * s->theta_1 - 2 * s->theta_2) / (2 * c->m_1 - c->m_2 * cos(2 * s->theta_1 - 2 * s->theta_2) + c->m_2);
+    jac[11] = 2 * s->omega_2 * c->l_2 * c->m_2 * sin(s->theta_1 - s->theta_2) / (c->l_1 * (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2));
+
+    // row 4 (left to right)
+    jac[12] = (2 * c->m_2 * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_1) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * pow(sin(s->theta_1), 2) * cos(s->theta_1 - s->theta_2) + (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * pow(sin(s->theta_1), 2) * cos(s->theta_1 - s->theta_2) - G * (c->m_1 + c->m_2) * cos(s->theta_1)) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2)) / (c->l_2 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * pow(sin(s->theta_1), 2) * sin(s->theta_2));
+    jac[13] = (-2 * c->m_2 * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_1) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) + pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * pow(sin(s->theta_2), 2) * pow(cos(s->theta_1 - s->theta_2), 2) - G * (c->m_1 + c->m_2) * sin(s->theta_1) * cos(s->theta_2) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * pow(sin(s->theta_2), 2) * sin(s->theta_1 - s->theta_2))) / (c->l_2 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * sin(s->theta_1) * pow(sin(s->theta_2), 2));
+    jac[14] = 2 * s->omega_1 * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1 - s->theta_2) / (c->l_2 * (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2));
+    jac[15] = 2 * s->omega_2 * c->m_2 * sin(2 * s->theta_1 - 2 * s->theta_2) / (2 * c->m_1 - c->m_2 * cos(2 * s->theta_1 - 2 * s->theta_2) + c->m_2);
+
+    return jac;
+}
+
 // integration step w/ adaptive RK45 alg for lddp
 void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t *s, double *dev_vec, cons_ddp_t *c, double *t, double *dt, double gamma) {
     deriv_ddp_t s_k1, s_k2, s_k3, s_k4, s_k5, s_k6, s_k7;
     double d_k1[2], d_k2[2], d_k3[2], d_k4[2], d_k5[2], d_k6[2], d_k7[2], d_b4[2], d_b5[2], d_temp[2];
     state_ddp_t s_temp = *s;
     state_ddp_t s_b4, s_b5;
-    double* jac;
 
     // compute trajectory estimate and deviation vector
     // k1
@@ -150,8 +201,10 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     s_k6 = deriv_lddp(&s_temp, c, *t + C6*(*dt), gamma);
 
     // k7
-    s_temp.phi = s->phi + A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi;
-    s_temp.omega = s->omega + A17 * s_k1.d2phi + A37 * s_k3.d2phi + A47 * s_k4.d2phi + A57 * s_k5.d2phi + A67 * s_k6.d2phi;
+    double mid_dphi = A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi;
+    double mid_d2phi = A17 * s_k1.d2phi + A37 * s_k3.d2phi + A47 * s_k4.d2phi + A57 * s_k5.d2phi + A67 * s_k6.d2phi;
+    s_temp.phi = s->phi + mid_dphi;
+    s_temp.omega = s->omega + mid_d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
     cblas_daxpy(2, A17 * (*dt), d_k1, 1, d_temp, 1);
     cblas_daxpy(2, A37 * (*dt), d_k3, 1, d_temp, 1);
@@ -165,17 +218,17 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
                 BETA,   d_k7, 1);
     s_k7 = deriv_lddp(&s_temp, c, *t + C7*(*dt), gamma);
 
-    // 4th-order trajectory estimate
-    s_b4.phi = s->phi + (*dt) * (A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi);
-    s_b4.omega = s->omega + (*dt) * (A17 * s_k1.d2phi + A37 * s_k3.d2phi + A47 * s_k4.d2phi + A57 * s_k5.d2phi + A67 * s_k6.d2phi);
     // 5th-order trajectory estimate
-    s_b5.phi = s->phi + (*dt) * (B1 * s_k1.dphi + B3 *s_k3.dphi + B4 * s_k4.dphi + B5 * s_k5.dphi + B6 * s_k6.dphi + B7 * s_k7.dphi);
-    s_b5.omega = s->omega + (*dt) * (B1 * s_k1.d2phi + B3 * s_k3.d2phi + B4 * s_k4.d2phi + B5 * s_k5.d2phi + B6 * s_k6.d2phi + B7 * s_k7.d2phi);
+    s_b5.phi = s->phi + (*dt) * mid_dphi;
+    s_b5.omega = s->omega + (*dt) * mid_d2phi;
+    // 4th-order trajectory estimate
+    s_b4.phi = s->phi + (*dt) * (B1 * s_k1.dphi + B3 *s_k3.dphi + B4 * s_k4.dphi + B5 * s_k5.dphi + B6 * s_k6.dphi + B7 * s_k7.dphi);
+    s_b4.omega = s->omega + (*dt) * (B1 * s_k1.d2phi + B3 * s_k3.d2phi + B4 * s_k4.d2phi + B5 * s_k5.d2phi + B6 * s_k6.d2phi + B7 * s_k7.d2phi);
     
-    // 4th and 5th-order deviation vector estimate
+    // 5th and 4th-order deviation vector estimate
     for (int i = 0; i < 2; i++) {
-        d_b4[i] = dev_vec[i] + (*dt) * (A17 * d_k1[i] + A37 * d_k3[i] + A47 * d_k4[i] + A57 * d_k5[i] + A67 * d_k6[i]);
-        d_b5[i] = dev_vec[i] + (*dt) * (B1 * d_k1[i] + B3 * d_k3[i] + B4 * d_k4[i] + B5 * d_k5[i] + B6 * d_k6[i] + B7 * d_k7[i]);
+        d_b5[i] = dev_vec[i] + (*dt) * (A17 * d_k1[i] + A37 * d_k3[i] + A47 * d_k4[i] + A57 * d_k5[i] + A67 * d_k6[i]);
+        d_b4[i] = dev_vec[i] + (*dt) * (B1 * d_k1[i] + B3 * d_k3[i] + B4 * d_k4[i] + B5 * d_k5[i] + B6 * d_k6[i] + B7 * d_k7[i]);
     }
 
     // compute + norm trajectory truncation error
@@ -187,15 +240,7 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     double e0 = (s_b5.phi - s_b4.phi) / scale_phi;
     double e1 = (s_b5.omega - s_b4.omega) / scale_omega;
 
-    // update trajectory step
-    s_next->err = hypot(e0, e1) / M_SQRT2;
-    s_next->next = s_b5;
-
-    // renorm deviation vector
-    double norm = hypot(d_b5[0], d_b5[1]);
-    d_next->norm = norm;
-
-    // compute + norm truncation error
+    // compute + norm deviation vector truncation error
     double scale[2], e[2];
     double err_norm = 0;
 
@@ -208,6 +253,14 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
         err_norm += pow(e[i], 2);
     }
     d_next->err = sqrt(err_norm / 2.0);
+
+    // update trajectory step
+    s_next->err = hypot(e0, e1) / M_SQRT2;
+    s_next->next = s_b5;
+
+    // renorm deviation vector
+    double norm = hypot(d_b5[0], d_b5[1]);
+    d_next->norm = norm;
 
     // norm b5 for reuse as deviation vector
     for (int i = 0; i < 2; i++) {
@@ -390,57 +443,7 @@ int rk45_dp_step(state_dp_t *s, cons_dp_t *c, double *t, double *dt) {
 
 }
 
-// takes lddp state and returns jacobian matrix (local linearization)
-double* jac_lddp(state_ddp_t s, cons_ddp_t *c) {
-    double* jac = (double*)calloc(4, sizeof(double));
-    jac[0] = 0;
-    jac[1] = 1;
-    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
-    jac[3] = - 2 * c->beta;
 
-    return jac;
-}
-
-// takes qddp state and returns jacobian matrix (local linearization)
-double* jac_qddp(state_ddp_t s, cons_ddp_t *c, double t) {
-    double* jac = (double*)calloc(4, sizeof(double));
-    jac[0] = 0;
-    jac[1] = 1;
-    jac[2] = - pow(c->omega0, 2) * cos(s.phi);
-    jac[3] = - 4 * c->beta * sin(s.omega) * s.omega;
-
-    return jac;
-}
-
-// takes dp state and returns jacobian matrix (local linearization)
-double* jac_dp(state_dp_t *s, cons_dp_t *c) {
-    double* jac = (double*)calloc(16, sizeof(double));
-    // row 1 (left to right)
-    jac[0] = 0;
-    jac[1] = 0;
-    jac[2] = 1;
-    jac[3] = 0;
-
-    // row 2 (left to right)
-    jac[4] = 0;
-    jac[5] = 0;
-    jac[6] = 0;
-    jac[7] = 1;
-
-    // row 3 (left to right)
-    jac[8] = (2 * c->m_2 * (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_2) - c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_1) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_1, 2) * c->l_1 * c->m_2 * pow(sin(s->theta_1), 2) * sin(s->theta_2) * pow(cos(s->theta_1 - s->theta_2), 2) + pow(s->omega_2, 2) * c->l_2 * c->m_2 * pow(sin(s->theta_1), 2) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2) - G * (c->m_1 + c->m_2) * sin(s->theta_2) * cos(s->theta_1) + c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * pow(sin(s->theta_1), 2) * sin(s->theta_1 - s->theta_2))) / (c->l_1 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * pow(sin(s->theta_1), 2) * sin(s->theta_2));
-    jac[9] = c->m_2 * ((-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_2, 2) * c->l_2 * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) - (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + (pow(s->omega_1, 2) * c->l_1 * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) + G * cos(s->theta_2)) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) - 2 * (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_2) - c->m_2 * (pow(s->omega_1, 2) * c->l_1 * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G) * sin(s->theta_1) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2)) / (c->l_1 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * sin(s->theta_1) * pow(sin(s->theta_2), 2));
-    jac[10] = 2 * s->omega_1 * c->m_2 * sin(2 * s->theta_1 - 2 * s->theta_2) / (2 * c->m_1 - c->m_2 * cos(2 * s->theta_1 - 2 * s->theta_2) + c->m_2);
-    jac[11] = 2 * s->omega_2 * c->l_2 * c->m_2 * sin(s->theta_1 - s->theta_2) / (c->l_1 * (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2));
-
-    // row 4 (left to right)
-    jac[12] = (2 * c->m_2 * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_1) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * pow(sin(s->theta_1), 2) * cos(s->theta_1 - s->theta_2) + (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * pow(sin(s->theta_1), 2) * cos(s->theta_1 - s->theta_2) - G * (c->m_1 + c->m_2) * cos(s->theta_1)) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2)) / (c->l_2 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * pow(sin(s->theta_1), 2) * sin(s->theta_2));
-    jac[13] = (-2 * c->m_2 * (pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2) * sin(s->theta_1) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * sin(s->theta_2) * cos(s->theta_1 - s->theta_2)) * sin(s->theta_2) * sin(s->theta_1 - s->theta_2) * cos(s->theta_1 - s->theta_2) + (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2) * (-pow(s->omega_1, 2) * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1) * pow(sin(s->theta_2), 2) * cos(s->theta_1 - s->theta_2) + pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * pow(sin(s->theta_2), 2) * pow(cos(s->theta_1 - s->theta_2), 2) - G * (c->m_1 + c->m_2) * sin(s->theta_1) * cos(s->theta_2) - (pow(s->omega_2, 2) * c->l_2 * c->m_2 * sin(s->theta_1) * sin(s->theta_1 - s->theta_2) + G * (c->m_1 + c->m_2)) * pow(sin(s->theta_2), 2) * sin(s->theta_1 - s->theta_2))) / (c->l_2 * pow(-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2, 2) * sin(s->theta_1) * pow(sin(s->theta_2), 2));
-    jac[14] = 2 * s->omega_1 * c->l_1 * (c->m_1 + c->m_2) * sin(s->theta_1 - s->theta_2) / (c->l_2 * (-c->m_1 + c->m_2 * pow(cos(s->theta_1 - s->theta_2), 2) - c->m_2));
-    jac[15] = 2 * s->omega_2 * c->m_2 * sin(2 * s->theta_1 - 2 * s->theta_2) / (2 * c->m_1 - c->m_2 * cos(2 * s->theta_1 - 2 * s->theta_2) + c->m_2);
-
-    return jac;
-}
 
 
 // // calculate one step of qddp's deviation vector with a LTM (linearized tangent map) using RK45

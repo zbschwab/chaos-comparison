@@ -62,12 +62,12 @@ int main(void) {
     double gamma_stop = 1.1;
     double gamma_step = (gamma_stop - gamma_start)/(GAMMA_STEPS - 1);
 
-    // printf("gamma_arr:\n");
-    // for (int i = 0; i < GAMMA_STEPS; i++) {
-    //     gamma_arr[i] = gamma_start + i * gamma_step;
-    //     printf(" %lf ", gamma_arr[i]);
-    // }
-    // printf("\n\n");
+    printf("gamma_arr:\n");
+    for (int i = 0; i < GAMMA_STEPS; i++) {
+        gamma_arr[i] = gamma_start + i * gamma_step;
+        printf(" %lf ", gamma_arr[i]);
+    }
+    printf("\n\ngamma_arr[73] = %lf\n\n", gamma_arr[73]);
 
     // make dp perturbation param arrays (initial angles of release)
     double theta_1[THETA_STEPS], theta_2[THETA_STEPS];
@@ -108,8 +108,9 @@ int main(void) {
     dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
     double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
     *dt = 4.8e-05;  // test, delete later
-    *dt = 1e-04;
+    //*dt = 1e-04;
     while (i < COMPUTE_STEPS) { //COMPUTE_STEPS
+        //if (*dt < 1.0e-04) {*dt = 1.0e-04;}
         rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_arr[73]);
         err = fmax(traj_step->err, dev_step->err);
 
