@@ -11,7 +11,7 @@
 #define PI 3.1415927
 #define EXP 0.2
 
-#define COMPUTE_STEPS 1e6
+#define COMPUTE_STEPS 1e6 
 #define GAMMA_STEPS 100
 #define THETA_STEPS 360  // range is 180, increment by 0.5 deg
 
@@ -22,8 +22,8 @@ int main(void) {
     state_ddp_t* s_lddp = (state_ddp_t*)malloc(sizeof(state_ddp_t));;
     double* lddp_jac = (double*)malloc(sizeof(double));
 
-    c_lddp->beta = 3.0/4.0 * PI;
-    c_lddp->omega0 = 3.0 * PI;
+    c_lddp->beta = 1.0; //3.0/4.0 * PI;
+    c_lddp->omega0 = 1.0; //3.0 * PI;
     c_lddp->omegad = 2.0 * PI;
 
     s_lddp->phi = 0.0;
@@ -65,9 +65,9 @@ int main(void) {
     printf("gamma_arr:\n");
     for (int i = 0; i < GAMMA_STEPS; i++) {
         gamma_arr[i] = gamma_start + i * gamma_step;
-        printf(" %lf ", gamma_arr[i]);
+        //printf(" %lf ", gamma_arr[i]);
     }
-    printf("\n\ngamma_arr[73] = %lf\n\n", gamma_arr[73]);
+    //printf("\n\ngamma_arr[73] = %lf\n\n", gamma_arr[73]);
 
     // make dp perturbation param arrays (initial angles of release)
     double theta_1[THETA_STEPS], theta_2[THETA_STEPS];
@@ -107,13 +107,18 @@ int main(void) {
     traj_step_ddp_t* traj_step = (traj_step_ddp_t*)malloc(sizeof(traj_step_ddp_t));
     dev_step_ddp_t* dev_step = (dev_step_ddp_t*)malloc(sizeof(dev_step_ddp_t));
     double* maxlyp_sum_lddp = (double*)calloc(1, sizeof(double));
+    double t_forward = 20.0;
     *dt = 4.8e-05;  // test, delete later
+    double gamma_stable = 0.0; //0.9;  // test, delete later
+    double gamma_lo = 1.073;  // test, delete later
+    double gamma_hi = 1.105;
+    printf("\ngamma_arr[73] = %lf\n\n", gamma_arr[73]);
     //*dt = 1e-04;
-    while (i < COMPUTE_STEPS) { //COMPUTE_STEPS
+    while (i < COMPUTE_STEPS) {
         //if (*dt < 1.0e-04) {*dt = 1.0e-04;}
-        rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_arr[73]);
+        rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_stable); //gamma_arr[]
         err = fmax(traj_step->err, dev_step->err);
-
+        
         if (err < 1.0) {
             // accept step
             *t += (*dt);
@@ -126,10 +131,13 @@ int main(void) {
             i += 2;
             // printf("SUCCESS: phi = %lf, omega = %lf, dev = %lf, %lf, dt = %.10e\n", s_lddp->phi, s_lddp->omega, d_lddp[0], d_lddp[1], *dt);
             
-            // update accumulated norm (max lyapunov sum)
-            *maxlyp_sum_lddp += log(dev_step->norm);
+            // update accumulated norm (max lyapunov sum), discarding transients (first 10 secs)
+            if (*t > t_forward) {
+                *maxlyp_sum_lddp += log(dev_step->norm);
+            }
             if (i % 10000 == 0){
-                printf("dev = %lf, %lf, dt = %.10e\n, dev_step->err = %.10e, dev_step->norm = %.10e, maxlyp_sum: %.10e\n", d_lddp[0], d_lddp[1], *dt, dev_step->err, dev_step->norm, *maxlyp_sum_lddp);
+                printf("gamma = %lf\n\n", gamma_stable);
+                printf("dev = %lf, %lf, dt = %.10e\n, t = %lf, dev_step->err = %lf, dev_step->norm = %.10e, maxlyp_sum: %.10e\n", d_lddp[0], d_lddp[1], *dt, *t, dev_step->err, dev_step->norm, *maxlyp_sum_lddp);
             }
 
         } else {
@@ -143,8 +151,8 @@ int main(void) {
         (*dt) *= factor;
     }
 
-    double maxlyp_lddp = *maxlyp_sum_lddp / *t;
-    printf("\nmaxlyp_sum / t = maxlyp_lddp:\n%lf / %lf = %lf\n", *maxlyp_sum_lddp, *t, maxlyp_lddp);
+    double maxlyp_lddp = *maxlyp_sum_lddp / (*t - t_forward);
+    printf("\nmaxlyp_sum / t = maxlyp_lddp:\n%lf / %lf = %lf\n", *maxlyp_sum_lddp, *t - t_forward, maxlyp_lddp);
 
     // // write data to csv
     // FILE *lddp_file;

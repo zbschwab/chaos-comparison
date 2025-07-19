@@ -12,7 +12,7 @@
 #define G 9.81
 
 #define ALPHA 1.0
-#define BETA 1.0
+#define BETA 0.0
 #define ATOL 1.0e-4
 #define RTOL 1.0e-3
 #define DT_MIN 0.00001
@@ -134,71 +134,81 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     // k2
     s_temp.phi = s->phi + A12 * s_k1.dphi;
     s_temp.omega = s->omega + A12 * s_k1.d2phi;
-    cblas_daxpy(2, A12 * (*dt), d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A12, d_k1, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         dev_vec, 1,
                 BETA,   d_k2, 1);
     s_k2 = deriv_lddp(&s_temp, c, *t + C2*(*dt), gamma);
+    d_k2[0] *= (*dt);
+    d_k2[1] *= (*dt);
 
     // k3
     s_temp.phi = s->phi + A13 * s_k1.dphi + A23 * s_k2.dphi;
     s_temp.omega = s->omega + A13 * s_k1.d2phi + A23 * s_k2.d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A13 * (*dt), d_k1, 1, d_temp, 1);
-    cblas_daxpy(2, A23 * (*dt), d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A13, d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A23, d_k2, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k3, 1);
     s_k3 = deriv_lddp(&s_temp, c, *t + C3*(*dt), gamma);
+    d_k3[0] *= (*dt);
+    d_k3[1] *= (*dt);
 
     // k4
     s_temp.phi = s->phi + A14 * s_k1.dphi + A24 * s_k2.dphi + A34 * s_k3.dphi;
     s_temp.omega = s->omega + A14 * s_k1.d2phi + A24 * s_k2.d2phi + A34 * s_k3.d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A14 * (*dt), d_k1, 1, d_temp, 1);
-    cblas_daxpy(2, A24 * (*dt), d_k2, 1, d_temp, 1);
-    cblas_daxpy(2, A34 * (*dt), d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A14, d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A24, d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A34, d_k3, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k4, 1);
     s_k4 = deriv_lddp(&s_temp, c, *t + C4*(*dt), gamma);
+    d_k4[0] *= (*dt);
+    d_k4[1] *= (*dt);
 
     // k5
     s_temp.phi = s->phi + A15 * s_k1.dphi + A25 * s_k2.dphi + A35 * s_k3.dphi + A45 * s_k4.dphi;
     s_temp.omega = s->omega + A15 * s_k1.d2phi + A25 * s_k2.d2phi + A35 * s_k3.d2phi + A45 * s_k4.d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A15 * (*dt), d_k1, 1, d_temp, 1);
-    cblas_daxpy(2, A25 * (*dt), d_k2, 1, d_temp, 1);
-    cblas_daxpy(2, A35 * (*dt), d_k3, 1, d_temp, 1);
-    cblas_daxpy(2, A45 * (*dt), d_k4, 1, d_temp, 1);
+    cblas_daxpy(2, A15, d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A25, d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A35, d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A45, d_k4, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k4, 1);
     s_k5 = deriv_lddp(&s_temp, c, *t + C5*(*dt), gamma);
+    d_k5[0] *= (*dt);
+    d_k5[1] *= (*dt);
 
     // k6
     s_temp.phi = s->phi + A16 * s_k1.dphi + A26 * s_k2.dphi + A36 * s_k3.dphi + A46 * s_k4.dphi + A56 * s_k5.dphi;
     s_temp.omega = s->omega + A16 * s_k1.d2phi + A26 * s_k2.d2phi + A36 * s_k3.d2phi + A46 * s_k4.d2phi + A56 * s_k5.d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A16 * (*dt), d_k1, 1, d_temp, 1);
-    cblas_daxpy(2, A26 * (*dt), d_k2, 1, d_temp, 1);
-    cblas_daxpy(2, A36 * (*dt), d_k3, 1, d_temp, 1);
-    cblas_daxpy(2, A46 * (*dt), d_k4, 1, d_temp, 1);
-    cblas_daxpy(2, A56 * (*dt), d_k5, 1, d_temp, 1);
+    cblas_daxpy(2, A16, d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A26, d_k2, 1, d_temp, 1);
+    cblas_daxpy(2, A36, d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A46, d_k4, 1, d_temp, 1);
+    cblas_daxpy(2, A56, d_k5, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k5, 1);
     s_k6 = deriv_lddp(&s_temp, c, *t + C6*(*dt), gamma);
+    d_k6[0] *= (*dt);
+    d_k6[1] *= (*dt);
 
     // k7
     double mid_dphi = A17 * s_k1.dphi + A37 * s_k3.dphi + A47 * s_k4.dphi + A57 * s_k5.dphi + A67 * s_k6.dphi;
@@ -206,17 +216,19 @@ void rk45_lddp_step(traj_step_ddp_t* s_next, dev_step_ddp_t* d_next, state_ddp_t
     s_temp.phi = s->phi + mid_dphi;
     s_temp.omega = s->omega + mid_d2phi;
     memcpy(d_temp, dev_vec, 2*sizeof(double));
-    cblas_daxpy(2, A17 * (*dt), d_k1, 1, d_temp, 1);
-    cblas_daxpy(2, A37 * (*dt), d_k3, 1, d_temp, 1);
-    cblas_daxpy(2, A47 * (*dt), d_k4, 1, d_temp, 1);
-    cblas_daxpy(2, A57 * (*dt), d_k5, 1, d_temp, 1);
-    cblas_daxpy(2, A67 * (*dt), d_k6, 1, d_temp, 1);
+    cblas_daxpy(2, A17, d_k1, 1, d_temp, 1);
+    cblas_daxpy(2, A37, d_k3, 1, d_temp, 1);
+    cblas_daxpy(2, A47, d_k4, 1, d_temp, 1);
+    cblas_daxpy(2, A57, d_k5, 1, d_temp, 1);
+    cblas_daxpy(2, A67, d_k6, 1, d_temp, 1);
     cblas_dgemv(CblasRowMajor, CblasNoTrans,
                 2, 2,
                 ALPHA,  jac_lddp(s_temp, c), 2,
                         d_temp, 1,
                 BETA,   d_k7, 1);
     s_k7 = deriv_lddp(&s_temp, c, *t + C7*(*dt), gamma);
+    d_k7[0] *= (*dt);
+    d_k7[1] *= (*dt);
 
     // 5th-order trajectory estimate
     s_b5.phi = s->phi + (*dt) * mid_dphi;
