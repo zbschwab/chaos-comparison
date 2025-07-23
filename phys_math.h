@@ -103,7 +103,7 @@ int rk45_qddp_step(state_ddp_t *s, cons_ddp_t *c, double *t, double *dt, double 
 int rk45_dp_step(state_dp_t *s, cons_dp_t *c, double *t, double *dt);
 
 // takes lddp state and returns jacobian matrix (local linearization)
-double* jac_lddp(state_ddp_t s, cons_ddp_t *c);
+void jac_lddp(state_ddp_t s, cons_ddp_t *c, double *res);
 
 // takes qddp state and returns jacobian matrix (local linearization)
 double* jac_qddp(state_ddp_t s, cons_ddp_t *c, double t);
