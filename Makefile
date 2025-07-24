@@ -8,13 +8,10 @@ all : chaos_comparison
 clean :
 	rm -rf chaos_comparison chaos_comparison.dSYM
 
-chaos_comparison : chaos_comparison.c socket.c phys_math.c phys_math.h butcher_tableau.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) chaos_comparison.c socket.c phys_math.c $(LDFLAGS) -o chaos_comparison
+chaos_comparison : chaos_comparison.c phys_math.c phys_math.h butcher_tableau.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) chaos_comparison.c phys_math.c $(LDFLAGS) -o chaos_comparison
 
 phys_math.o : phys_math.c phys_math.h butcher_tableau.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c phys_math.c 
-
-socket.o : socket.c
-	$(CC) $(CFLAGS) -c socket.c
 
 .PHONY: all clean
