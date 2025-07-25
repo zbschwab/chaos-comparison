@@ -1,12 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <math.h>
 #include <cblas.h>
 
 #include "phys_math.h"
 #include "butcher_tableau.h"
+
+#define PORT 8080
 
 #define PI 3.1415927
 #define EXP 0.2
@@ -15,7 +23,59 @@
 #define GAMMA_STEPS 100
 #define THETA_STEPS 360 // range is 180, increment by 0.5 deg
 
-int main(void)
+// Send a across a socket with a header that includes the message length.
+int send_message(int fd, double* message, size_t num_doubles) {
+    // If the message is NULL, set errno to EINVAL and return an error
+    if (message == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    // Calculate the total number of bytes to send for the double array
+    size_t total_bytes_to_send = num_doubles * sizeof(double);
+
+    // First, send the length of the message in a size_t
+    if (write(fd, &total_bytes_to_send, sizeof(size_t)) != sizeof(size_t)) {
+        // Writing failed, so return an error
+        printf("Writing failed\n");
+        return -1;
+    }
+
+    // Now we can send the message. Loop until the entire message has been written.
+    size_t bytes_written = 0;
+    while (bytes_written < total_bytes_to_send) {
+        // Try to write the entire remaining message
+        ssize_t rc = write(fd, (char*)message + bytes_written, total_bytes_to_send - bytes_written);
+        // Did the write fail? If so, return an error
+        if (rc <= 0) {
+            perror("Writing message data failed");
+            return -1;
+        }
+        // If there was no error, write returned the number of bytes written
+        bytes_written += rc;
+    }
+
+    return 0;
+}
+
+int confirm_sent(int fd) {
+    char buffer[16];
+    ssize_t n = recv(fd, buffer, sizeof(buffer) - 1, 0);
+    if (n <= 0) {
+        perror("Confirmation failed");
+        return -1;
+    }
+
+    buffer[n] = '\0';
+    if (strcmp(buffer, "OK") == 0) {
+        return 0;  // success
+    } else {
+        fprintf(stderr, "Unexpected confirmation: %s\n", buffer);
+        return -1;
+    }
+}
+
+int main(int argc, char const* argv[])
 {
     // set initial system conditions: lddp
     cons_ddp_t *c_lddp = (cons_ddp_t *)malloc(sizeof(cons_ddp_t));
@@ -137,35 +197,26 @@ int main(void)
             i += 2;
 
             // update accumulated norm (max lyapunov sum), discarding transients (first 10 secs)
-            if (*t > t_forward)
-            {
+            if (*t > t_forward) {
                 *maxlyp_sum_lddp += log(dev_step->norm);
-            }
-            if (i % 10000 == 0)
-            {
+            } if (i % 10000 == 0) {
                 printf("dev = %lf, %lf, dt = %.10e\n, t = %lf, dev_step->err = %lf, dev_step->norm = %.10e, maxlyp_sum: %.10e\n", d_lddp[0], d_lddp[1], *dt, *t, dev_step->err, dev_step->norm, *maxlyp_sum_lddp);
             }
-        }
-        else
-        {
+        } else {
             printf("max err = %lf\n", err);
         }
 
         // compute new dt (w/ safety clamp)
         double factor = 0.9 * pow(1.0 / err, EXP);
-        if (factor < 0.1)
-        {
-            factor = 0.1;
-        }
-        if (factor > 5.0)
-        {
-            factor = 5.0;
-        }
+        if (factor < 0.1) {factor = 0.1;}
+        if (factor > 5.0) {factor = 5.0;}
         (*dt) *= factor;
     }
 
     double maxlyp_lddp = *maxlyp_sum_lddp / (*t - t_forward);
     printf("\nmaxlyp_sum / t = maxlyp_lddp:\n%lf / %lf = %lf\n", *maxlyp_sum_lddp, *t - t_forward, maxlyp_lddp);
+
+
 
     // // write data to csv
     // FILE *lddp_file;
@@ -185,26 +236,75 @@ int main(void)
     // }
     // fclose(qddp_file);
 
-    free(s_lddp);
-    free(s_qddp);
-    free(s_dp);
-    free(c_lddp);
-    free(c_qddp);
-    free(c_dp);
+    int client_fd, status = -1;
+    struct sockaddr_in server_addr;
 
-    free(lddp_jac);
-    free(qddp_jac);
-    free(dp_jac);
+    // create socket
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
 
-    free(d_lddp);
-    free(d_qddp);
-    free(d_dp);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
 
-    free(lddp_traj);
-    free(qddp_traj);
-    free(dp_traj);
+    if (inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr) <= 0) {
+        perror("Invalid address/ Address not supported");
+        goto cleanup;
+    }
 
-    free(traj_step);
-    free(dev_step);
-    free(maxlyp_sum_lddp);
+    // connect to server
+    if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Connection Failed");
+        goto cleanup;
+    }
+
+    // Example double array to send
+    double data_to_send[] = {1.23, 4.56, 7.89, 10.11, 12.13};
+    size_t num_elements = sizeof(data_to_send) / sizeof(data_to_send[0]);
+
+    printf("Sending %zu doubles (%zu bytes total)...\n", num_elements, num_elements * sizeof(double));
+
+    // Send the message
+    if (send_message(client_fd, data_to_send, num_elements) == 0) {
+        printf("Data sent successfully.\n");
+        // wait for server to confirm all data was successfully
+        if (confirm_sent(client_fd) == 0) {
+            // let the server know you're done writing
+            shutdown(client_fd, SHUT_WR);
+            status = 0;
+        } else {
+            printf("Failed to confirm data was recieved.\n");
+            goto cleanup;
+        }
+    } else {
+        printf("Failed to send data.\n");
+    }
+
+    cleanup:
+        free(s_lddp);
+        free(s_qddp);
+        free(s_dp);
+        free(c_lddp);
+        free(c_qddp);
+        free(c_dp);
+
+        free(lddp_jac);
+        free(qddp_jac);
+        free(dp_jac);
+
+        free(d_lddp);
+        free(d_qddp);
+        free(d_dp);
+
+        free(lddp_traj);
+        free(qddp_traj);
+        free(dp_traj);
+
+        free(traj_step);
+        free(dev_step);
+        free(maxlyp_sum_lddp);
+
+        close(client_fd);  // closing the connected socket
+        return status;
 }
