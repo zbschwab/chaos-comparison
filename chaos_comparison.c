@@ -179,6 +179,12 @@ int main(int argc, char const* argv[])
     double gamma_hi = 1.105;
     printf("\ngamma_arr[73] = %lf\n\n", gamma_arr[73]);
     //*dt = 1e-04;
+
+    // track lyp convergence
+    int j = 0;
+    double* lyp_est = NULL;
+    double* lyp_est_arr;
+
     while (i < COMPUTE_STEPS)
     {
         rk45_lddp_step(traj_step, dev_step, s_lddp, d_lddp, c_lddp, t, dt, gamma_lo); // gamma_arr[]
@@ -202,6 +208,11 @@ int main(int argc, char const* argv[])
             } if (i % 10000 == 0) {
                 printf("dev = %lf, %lf, dt = %.10e\n, t = %lf, dev_step->err = %lf, dev_step->norm = %.10e, maxlyp_sum: %.10e\n", d_lddp[0], d_lddp[1], *dt, *t, dev_step->err, dev_step->norm, *maxlyp_sum_lddp);
             }
+            j+=2;
+            lyp_est_arr = (double *)realloc(lyp_est, j*sizeof(double));
+            lyp_est_arr[j-2] = *maxlyp_sum_lddp / (*t - t_forward);
+            lyp_est_arr[j-1] = *t;
+            
         } else {
             printf("max err = %lf\n", err);
         }
@@ -260,13 +271,15 @@ int main(int argc, char const* argv[])
     }
 
     // Example double array to send
-    double data_to_send[] = {1.23, 4.56, 7.89, 10.11, 12.13};
-    size_t num_elements = sizeof(data_to_send) / sizeof(data_to_send[0]);
+    //double data_to_send[] = {1.23, 4.56, 7.89, 10.11, 12.13};
+    //size_t num_elements = sizeof(data_to_send) / sizeof(data_to_send[0]);
+    size_t num_elements = j;
+
 
     printf("Sending %zu doubles (%zu bytes total)...\n", num_elements, num_elements * sizeof(double));
 
     // Send the message
-    if (send_message(client_fd, data_to_send, num_elements) == 0) {
+    if (send_message(client_fd, lyp_est_arr, num_elements) == 0) {
         printf("Data sent successfully.\n");
         // wait for server to confirm all data was successfully
         if (confirm_sent(client_fd) == 0) {
@@ -304,6 +317,7 @@ int main(int argc, char const* argv[])
         free(traj_step);
         free(dev_step);
         free(maxlyp_sum_lddp);
+        free(lyp_est_arr);
 
         close(client_fd);  // closing the connected socket
         return status;
