@@ -6,12 +6,9 @@ LDFLAGS := -L/opt/homebrew/opt/openblas/lib -lopenblas -lm
 all : chaos_comparison
 
 clean :
-	rm -rf chaos_comparison chaos_comparison.dSYM
+	rm -rf main main.dSYM
 
-chaos_comparison : chaos_comparison.c phys_math.c phys_math.h butcher_tableau.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) chaos_comparison.c phys_math.c $(LDFLAGS) -o chaos_comparison
-
-phys_math.o : phys_math.c phys_math.h butcher_tableau.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c phys_math.c 
+main : main.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) main.c $(LDFLAGS) -o main
 
 .PHONY: all clean
