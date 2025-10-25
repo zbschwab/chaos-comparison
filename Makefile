@@ -1,7 +1,7 @@
 CC := clang
 CPPFLAGS := -I/opt/homebrew/opt/openblas/include
 CFLAGS := -g -Wall -Wno-unused-variable -fsanitize=address -mcpu=apple-m1
-LDFLAGS := -L/opt/homebrew/opt/openblas/lib -lopenblas -lm 
+LDFLAGS := -L/opt/homebrew/opt/openblas/lib -lm #lopenblas 
 
 all : chaos_comparison
 
